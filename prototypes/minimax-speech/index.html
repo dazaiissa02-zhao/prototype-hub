@@ -1,0 +1,6059 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniMax Speech Prototype</title>
+<style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --panel: rgba(28, 31, 36, 0.88);
+  --panel-soft: rgba(255, 255, 255, 0.03);
+  --card: rgba(255, 255, 255, 0.035);
+  --card-strong: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  --text: #f3f4f6;
+  --text-soft: #cfd7e6;
+  --text-faint: #9ea4b3;
+  --text-dim: #6f7684;
+  --blue: #73b8ff;
+  --blue-soft: rgba(115, 184, 255, 0.12);
+  --blue-deep: rgba(115, 184, 255, 0.18);
+  --purple: #8f6cff;
+  --purple-soft: rgba(143, 108, 255, 0.16);
+  --track: rgba(255, 255, 255, 0.12);
+  --shadow: 0 28px 90px rgba(0, 0, 0, 0.4);
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #101011 0%, #0d0d0f 100%);
+  color: var(--text);
+  font-family: "PingFang SC", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 22px 18px 48px;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 0.8px, transparent 0.8px);
+  background-size: 20px 20px;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+body::after {
+  display: none;
+}
+
+.generator {
+  width: min(1080px, calc(100vw - 36px));
+  position: relative;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #2b2a29;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+  overflow: visible;
+}
+
+.composer {
+  position: relative;
+  padding: 22px 30px 0;
+}
+
+.textarea-wrap {
+  position: relative;
+}
+
+.input-box {
+  width: 100%;
+  min-height: 108px;
+  border: none;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.input-box::placeholder {
+  color: rgba(170, 170, 170, 0.78);
+}
+
+.resize-mark {
+  display: none;
+}
+
+.expand-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: rgba(214, 214, 214, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.expand-btn:hover {
+  color: rgba(236, 236, 236, 0.94);
+}
+
+.divider {
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.micro-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0 6px;
+}
+
+.micro-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(232, 238, 249, 0.9);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.micro-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.micro-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.micro-btn.active {
+  border-color: rgba(143, 121, 255, 0.3);
+  background: rgba(143, 121, 255, 0.14);
+  color: #d7caff;
+}
+
+.micro-separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.micro-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 19, 24, 0.98);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.28);
+  display: none;
+  z-index: 40;
+}
+
+.micro-popover.open {
+  display: grid;
+  gap: 10px;
+}
+
+.micro-popover-title {
+  color: rgba(237, 242, 251, 0.92);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.emotion-grid,
+.interjection-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emotion-chip,
+.interjection-chip,
+.pause-chip {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(232, 238, 249, 0.9);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pause-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pause-custom {
+  display: flex;
+  gap: 8px;
+}
+
+.pause-custom input {
+  flex: 1;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  font: inherit;
+  font-size: 13px;
+  padding: 0 10px;
+  outline: none;
+}
+
+.pause-custom button {
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(143, 121, 255, 0.16);
+  color: #d7caff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 30px 20px;
+  align-items: center;
+}
+
+.toolbar-main,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: nowrap;
+}
+
+.toolbar-right {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.tool-btn svg,
+.icon-pill svg {
+  flex-shrink: 0;
+}
+
+.dropdown-trigger .arrow {
+  color: rgba(158, 164, 179, 0.68);
+  font-size: 12px;
+}
+
+.toolbar-right {
+  gap: 12px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  min-height: 40px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(243, 243, 243, 0.94);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.dropdown-trigger:hover,
+.dropdown.open .dropdown-trigger {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
+.dropdown.open .dropdown-trigger.primary {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dropdown-trigger.primary {
+  min-width: 216px;
+  justify-content: flex-start;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dropdown-trigger.task {
+  min-width: 168px;
+  padding-left: 0;
+}
+
+.dropdown-trigger svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dropdown-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+}
+
+.dropdown-title {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.dropdown-subtitle {
+  color: var(--text-dim);
+  font-size: 0;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 100%;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(24, 24, 25, 0.98);
+  box-shadow: 0 16px 24px rgba(0, 0, 0, 0.22);
+  display: none;
+  z-index: 12;
+}
+
+.dropdown.open .dropdown-menu {
+  display: grid;
+  gap: 6px;
+}
+
+.model-option {
+  position: relative;
+  width: 100%;
+  padding: 10px 10px 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.model-option:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.model-option.active {
+  background: rgba(115, 184, 255, 0.08);
+}
+
+.model-option.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--blue);
+}
+
+.model-option-name {
+  font-size: 12px;
+}
+
+.model-option-desc {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.icon-pill,
+.ghost-pill,
+.send-btn {
+  border: none;
+  border-radius: 16px;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.icon-pill {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-faint);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-pill:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.icon-pill.active {
+  background: rgba(111, 173, 255, 0.12);
+  color: #fff;
+}
+
+.icon-pill.recording {
+  background: rgba(255, 109, 109, 0.16);
+  color: #ffd1d1;
+  box-shadow: inset 0 0 0 1px rgba(255, 109, 109, 0.18);
+}
+
+.record-pill {
+  color: #8f79ff;
+}
+
+.record-pill svg {
+  width: 20px;
+  height: 20px;
+}
+
+.record-pill.recording {
+  background: rgba(143, 121, 255, 0.16);
+  color: #b9a7ff;
+  box-shadow: inset 0 0 0 1px rgba(143, 121, 255, 0.2);
+}
+
+.icon-pill svg {
+  width: 18px;
+  height: 18px;
+}
+
+.translate-glyph {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  color: currentColor;
+}
+
+.translate-glyph-zh,
+.translate-glyph-en {
+  position: absolute;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.translate-glyph-zh {
+  left: 1px;
+  top: 0;
+  font-size: 15px;
+}
+
+.translate-glyph-en {
+  right: 0;
+  bottom: 0;
+  font-size: 13px;
+}
+
+.counter,
+.credit {
+  font-size: 15px;
+  color: rgba(176, 176, 176, 0.9);
+}
+
+.counter {
+  min-width: 92px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.longmode-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(226, 231, 240, 0.92);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.longmode-inline-label {
+  letter-spacing: 0.01em;
+}
+
+.longmode-toggle {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.longmode-toggle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+  transition: transform 0.18s ease;
+}
+
+.longmode-toggle.on {
+  background: rgba(115, 184, 255, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(115, 184, 255, 0.22);
+}
+
+.longmode-toggle.on::after {
+  transform: translateX(20px);
+}
+
+.longmode-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.longmode-toggle.on:hover {
+  background: rgba(115, 184, 255, 0.5);
+}
+
+.credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.credit strong {
+  color: #ffd455;
+  font-weight: 600;
+}
+
+.send-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(183, 183, 183, 0.9);
+  color: #1e1e1e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.send-btn:disabled {
+  background: rgba(121, 121, 121, 0.28);
+  color: rgba(217, 217, 217, 0.38);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.settings-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: none;
+}
+
+.settings-panel.open {
+  display: block;
+}
+
+.settings-card {
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
+  padding: 10px;
+}
+
+.panel-section + .panel-section {
+  margin-top: 8px;
+}
+
+.section-shell {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 8px 9px 4px;
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.section-tag {
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  color: var(--blue);
+  background: rgba(115, 184, 255, 0.12);
+}
+
+.section-tag.status {
+  color: #d7c3ff;
+  background: rgba(143, 108, 255, 0.18);
+}
+
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reset-link,
+.collapse-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.section-title-wrap > svg,
+.reset-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+.reset-link:hover,
+.collapse-btn:hover {
+  color: rgba(246, 249, 255, 0.96);
+}
+
+.collapse-btn .chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.section-shell.expanded .collapse-btn .chevron {
+  transform: rotate(225deg);
+}
+
+.section-body {
+  padding: 0 0 2px;
+}
+
+.section-shell.collapsed .section-body {
+  display: none;
+}
+
+.settings-title {
+  padding: 2px 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.voice-current {
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.025));
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.voice-current:hover {
+  border-color: rgba(115, 184, 255, 0.24);
+}
+
+.voice-current-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.voice-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(115, 184, 255, 0.22), rgba(115, 184, 255, 0.12));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.voice-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.voice-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.voice-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.voice-name {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.voice-name-copy {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.voice-name-copy:hover {
+  background: rgba(115, 184, 255, 0.14);
+  color: var(--blue);
+}
+
+.voice-name-copy svg {
+  width: 14px;
+  height: 14px;
+}
+
+.voice-desc {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.voice-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lang-dropdown {
+  position: relative;
+}
+
+.lang-trigger {
+  min-width: 62px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(115, 184, 255, 0.16);
+  background: rgba(115, 184, 255, 0.12);
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.lang-dropdown.open .lang-trigger {
+  border-color: rgba(115, 184, 255, 0.26);
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 126px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(7, 10, 14, 0.92);
+  box-shadow: 0 20px 38px rgba(0, 0, 0, 0.28);
+  display: none;
+  z-index: 15;
+}
+
+.lang-dropdown.open .lang-menu {
+  display: grid;
+  gap: 6px;
+}
+
+.lang-option {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lang-option:hover,
+.lang-option.active {
+  background: rgba(115, 184, 255, 0.12);
+  color: var(--text);
+}
+
+.voice-list {
+  display: none;
+}
+
+.voice-pill {
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.voice-pill.featured {
+  color: #d7c3ff;
+  background: rgba(143, 108, 255, 0.16);
+}
+
+.voice-pill.blue {
+  color: var(--blue);
+  background: rgba(115, 184, 255, 0.14);
+}
+
+.voice-option-desc {
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.voice-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 12, 0.74);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  z-index: 60;
+}
+
+.voice-modal.open {
+  display: flex;
+}
+
+.voice-modal-panel {
+  width: min(1080px, 100%);
+  max-height: min(760px, calc(100vh - 56px));
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 26, 31, 0.98), rgba(15, 17, 21, 0.98));
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.44);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.voice-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.voice-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.voice-modal-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(221, 226, 235, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.voice-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.voice-modal-body {
+  padding: 18px 24px 24px;
+  display: grid;
+  gap: 16px;
+  overflow: auto;
+}
+
+.voice-tabs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.voice-tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: rgba(150, 156, 169, 0.82);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 0 10px;
+  cursor: pointer;
+}
+
+.voice-tab.active {
+  color: #f5f7fb;
+}
+
+.voice-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.voice-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.voice-filter-summary {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.voice-filter-summary.open {
+  display: flex;
+}
+
+.voice-filter-chip {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 242, 251, 0.92);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.voice-filter-chip:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.voice-filter-chip-key {
+  color: rgba(160, 169, 185, 0.84);
+}
+
+.voice-filter-chip-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.voice-filter-chip-close {
+  color: rgba(184, 192, 205, 0.74);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.voice-filter-reset {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(219, 225, 236, 0.88);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.voice-filter-reset:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.voice-filter-reset svg {
+  width: 20px;
+  height: 20px;
+}
+
+.voice-search {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+}
+
+.voice-search svg {
+  width: 18px;
+  height: 18px;
+  color: rgba(186, 193, 209, 0.72);
+}
+
+.voice-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #edf2fb;
+  font: inherit;
+  font-size: 14px;
+}
+
+.voice-search input::placeholder {
+  color: rgba(156, 164, 179, 0.72);
+}
+
+.voice-filter-btn {
+  min-width: 102px;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(232, 238, 249, 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.voice-filter-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.voice-library-list {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 6px;
+  min-height: 360px;
+  align-content: start;
+}
+
+.voice-empty-state {
+  min-height: 360px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+  color: rgba(121, 128, 142, 0.56);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 14px;
+}
+
+.voice-library-item {
+  min-height: 92px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.voice-library-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.voice-preview-play {
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 16px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: rgba(236, 242, 251, 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.voice-preview-play:hover {
+  background: rgba(143, 121, 255, 0.16);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.voice-library-meta {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.voice-library-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5f7fb;
+}
+
+.voice-library-sub {
+  color: rgba(158, 164, 179, 0.84);
+  font-size: 13px;
+}
+
+.voice-library-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.voice-library-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.voice-clone-workbench {
+  display: grid;
+  gap: 18px;
+}
+
+.clone-recorder-card {
+  min-height: 132px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.025));
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.clone-recorder-center {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.clone-record-btn {
+  width: 72px;
+  height: 72px;
+  border: none;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(179, 162, 255, 0.28), rgba(126, 99, 255, 0.14));
+  color: #8f79ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(143, 121, 255, 0.18);
+}
+
+.clone-record-btn.recording {
+  background: radial-gradient(circle at 30% 30%, rgba(255, 120, 120, 0.28), rgba(255, 106, 106, 0.14));
+  color: #ff8f8f;
+  box-shadow: inset 0 0 0 1px rgba(255, 106, 106, 0.2);
+}
+
+.clone-record-btn svg {
+  width: 32px;
+  height: 32px;
+}
+
+.clone-record-hint {
+  color: rgba(210, 218, 230, 0.84);
+  font-size: 14px;
+}
+
+.clone-section {
+  display: grid;
+  gap: 10px;
+}
+
+.clone-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f2f6fd;
+}
+
+.clone-lang-row {
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clone-lang-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.clone-lang-clear {
+  border: none;
+  background: transparent;
+  color: rgba(185, 193, 208, 0.74);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.clone-text-box {
+  min-height: 194px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.028);
+  display: grid;
+  gap: 16px;
+}
+
+.clone-textarea {
+  width: 100%;
+  min-height: 108px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: #edf2fb;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.clone-textarea::placeholder {
+  color: rgba(156, 164, 179, 0.72);
+}
+
+.clone-text-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(180, 188, 203, 0.74);
+  font-size: 12px;
+}
+
+.clone-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: rgba(210, 218, 230, 0.84);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.clone-consent input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #7e63ff;
+}
+
+.clone-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+
+.clone-slots {
+  color: rgba(180, 188, 203, 0.84);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.clone-generate-btn {
+  min-width: 156px;
+  height: 52px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-generate-btn:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(215, 223, 237, 0.5);
+  cursor: not-allowed;
+}
+
+.clone-result-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(232, 238, 249, 0.9);
+}
+
+.clone-result-empty {
+  min-height: 88px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(150, 158, 172, 0.76);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+
+.my-voices-board {
+  display: grid;
+  gap: 14px;
+}
+
+.my-voices-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.my-voices-count {
+  color: rgba(188, 196, 209, 0.82);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.my-voices-create {
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(143, 121, 255, 0.12);
+  color: #d4c8ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.my-voices-create:hover:not(:disabled) {
+  background: rgba(143, 121, 255, 0.18);
+}
+
+.my-voices-create:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.my-voices-empty {
+  min-height: 280px;
+  border-radius: 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 28px;
+}
+
+.my-voices-empty-inner {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.my-voices-empty-mic {
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  background: rgba(143, 121, 255, 0.12);
+  color: #a996ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.my-voices-empty-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.my-voices-empty-copy {
+  color: rgba(182, 189, 202, 0.76);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.my-voices-no-match {
+  min-height: 280px;
+  border-radius: 22px;
+  background: transparent;
+  color: rgba(121, 128, 142, 0.56);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 14px;
+}
+
+.my-voices-big-cta {
+  height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.my-voice-list {
+  display: grid;
+  gap: 10px;
+}
+
+.my-voice-item {
+  min-height: 92px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.my-voice-item.pending {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.my-voice-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.my-voice-icon,
+.my-voice-play-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(220, 227, 240, 0.88);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.my-voice-play-icon {
+  border: none;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.my-voice-play-icon:hover {
+  background: rgba(143, 121, 255, 0.18);
+  color: #f5f2ff;
+  transform: translateY(-1px);
+}
+
+.my-voice-meta {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.my-voice-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f5f7fb;
+}
+
+.my-voice-sub {
+  color: rgba(182, 189, 202, 0.76);
+  font-size: 13px;
+}
+
+.my-voice-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-voice-pick {
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.my-voice-pick {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(238, 243, 252, 0.88);
+}
+
+.my-voice-pick.selected {
+  background: rgba(143, 121, 255, 0.14);
+  color: #d7caff;
+}
+
+.my-voices-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.my-voices-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.my-voices-toolbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.my-voices-summary {
+  color: rgba(188, 196, 209, 0.82);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.clone-inline-view {
+  display: grid;
+  gap: 16px;
+}
+
+.clone-inline-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clone-back-btn {
+  border: none;
+  background: transparent;
+  color: rgba(222, 229, 239, 0.9);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clone-inline-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.clone-guide-card,
+.clone-samples-shell,
+.clone-name-shell {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+}
+
+.clone-guide-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.clone-guide-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.clone-guide-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 121, 255, 0.3);
+  background: rgba(143, 121, 255, 0.1);
+  color: #cdbfff;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.clone-guide-copy {
+  color: rgba(232, 238, 249, 0.94);
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.clone-trial-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.clone-trial-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.clone-trial-select {
+  width: 100%;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 14px;
+  outline: none;
+}
+
+.clone-trial-text {
+  min-height: 132px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(232, 238, 249, 0.9);
+  font-size: 15px;
+  line-height: 1.8;
+  padding: 16px 18px;
+}
+
+.clone-record-area {
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 20px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.clone-record-area.recording {
+  border-style: solid;
+  border-color: rgba(255, 118, 118, 0.24);
+  background: rgba(255, 118, 118, 0.05);
+}
+
+.clone-record-button {
+  min-width: 190px;
+  height: 48px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-record-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.clone-record-button.recording {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.clone-record-hint-inline {
+  color: rgba(176, 184, 198, 0.76);
+  font-size: 12px;
+}
+
+.clone-record-timer {
+  color: #ffb4b4;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.clone-stop-btn {
+  min-width: 120px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(238, 243, 252, 0.88);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-stop-btn.is-disabled {
+  opacity: 0.38;
+}
+
+.clone-samples-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.clone-samples-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.clone-samples-count {
+  color: rgba(182, 189, 202, 0.76);
+  font-size: 12px;
+}
+
+.clone-samples-list {
+  display: grid;
+  gap: 10px;
+}
+
+.clone-sample-item {
+  min-height: 60px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.clone-sample-play,
+.clone-sample-delete {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(238, 243, 252, 0.88);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  cursor: pointer;
+}
+
+.clone-sample-meta {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.clone-sample-name {
+  color: rgba(240, 245, 252, 0.94);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.clone-sample-sub {
+  color: rgba(176, 184, 198, 0.76);
+  font-size: 12px;
+}
+
+.clone-inline-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.clone-inline-toggle-label {
+  display: grid;
+  gap: 3px;
+}
+
+.clone-inline-toggle-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clone-inline-toggle-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.clone-inline-tooltip {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  color: #8f79ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+.clone-inline-tooltip svg {
+  width: 18px;
+  height: 18px;
+}
+
+.clone-inline-tooltip-bubble {
+  position: absolute;
+  left: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(520px, calc(100vw - 120px));
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(24, 27, 34, 0.98);
+  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.35);
+  color: rgba(232, 238, 249, 0.92);
+  font-size: 13px;
+  line-height: 1.7;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 3;
+}
+
+.clone-inline-tooltip:hover .clone-inline-tooltip-bubble {
+  opacity: 1;
+}
+
+.clone-inline-toggle-copy {
+  color: rgba(176, 184, 198, 0.76);
+  font-size: 12px;
+}
+
+.clone-name-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.clone-result-view {
+  display: grid;
+  gap: 22px;
+}
+
+.clone-result-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.clone-result-slots {
+  color: rgba(182, 189, 202, 0.82);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.clone-result-regen {
+  min-width: 156px;
+  height: 46px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-result-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f2f6fd;
+}
+
+.clone-result-card {
+  min-height: 132px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 24px 28px;
+}
+
+.clone-result-play {
+  width: 64px;
+  height: 64px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #171a21;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.clone-result-meta {
+  display: grid;
+  gap: 8px;
+}
+
+.clone-result-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f7f9fc;
+}
+
+.clone-result-copy {
+  color: rgba(196, 203, 216, 0.82);
+  font-size: 14px;
+}
+
+.clone-result-confirm-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.clone-result-confirm {
+  min-width: 164px;
+  height: 48px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-result-confirm:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(215, 223, 237, 0.36);
+  cursor: not-allowed;
+}
+
+.clone-consent-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: rgba(214, 220, 232, 0.84);
+  font-size: 13px;
+  line-height: 1.85;
+  cursor: pointer;
+}
+
+.clone-consent-inline input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #7e63ff;
+}
+
+.clone-name-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.clone-name-input-inline {
+  width: 100%;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 14px;
+  outline: none;
+}
+
+.clone-submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.clone-submit-meta {
+  color: rgba(182, 189, 202, 0.78);
+  font-size: 13px;
+}
+
+.clone-submit-btn-inline {
+  min-width: 142px;
+  height: 44px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(109, 136, 255, 0.28);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.clone-submit-btn-inline:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(109, 136, 255, 0.34);
+}
+
+.clone-submit-btn-inline:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(215, 223, 237, 0.36);
+  box-shadow: none;
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.my-voice-loading {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-top-color: rgba(143, 121, 255, 0.9);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.clone-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 12, 0.78);
+  backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  z-index: 70;
+}
+
+.clone-modal.open {
+  display: flex;
+}
+
+.clone-modal-panel {
+  width: min(720px, 100%);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 26, 31, 0.98), rgba(15, 17, 21, 0.98));
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.44);
+  overflow: hidden;
+}
+
+.clone-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.clone-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.clone-modal-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(221, 226, 235, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.clone-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.clone-modal-body {
+  padding: 20px 24px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.leave-confirm-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.52);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  z-index: 95;
+}
+
+.leave-confirm-modal.open {
+  display: flex;
+}
+
+.leave-confirm-panel {
+  width: min(960px, 100%);
+  border-radius: 28px;
+  background: #ffffff;
+  color: #191b22;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.leave-confirm-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 34px 36px 0;
+}
+
+.leave-confirm-title {
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.leave-confirm-close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #a1a8b6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.leave-confirm-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: #5f6775;
+}
+
+.leave-confirm-body {
+  padding: 42px 36px 26px;
+  font-size: 28px;
+  line-height: 1.45;
+  color: #656d7c;
+  font-weight: 600;
+}
+
+.leave-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 22px;
+  padding: 0 28px 28px;
+}
+
+.leave-confirm-btn,
+.leave-confirm-btn-primary {
+  min-width: 134px;
+  height: 88px;
+  border: none;
+  border-radius: 44px;
+  padding: 0 34px;
+  font-size: 28px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.leave-confirm-btn {
+  background: #f3f5fa;
+  color: #3c4350;
+}
+
+.leave-confirm-btn-primary {
+  background: linear-gradient(135deg, #8566ff, #6c4ef2);
+  color: #fff;
+}
+
+.clone-modal-center {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.clone-modal-mic {
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  background: rgba(143, 121, 255, 0.1);
+  color: #9f8aff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(143, 121, 255, 0.16);
+}
+
+.clone-modal-mic.recording {
+  background: rgba(255, 106, 106, 0.12);
+  color: #ff9090;
+  box-shadow: inset 0 0 0 1px rgba(255, 106, 106, 0.18);
+}
+
+.clone-modal-copy {
+  color: rgba(220, 226, 238, 0.9);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.clone-modal-sample {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(232, 238, 249, 0.9);
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.clone-modal-hint {
+  color: rgba(176, 184, 198, 0.76);
+  font-size: 13px;
+}
+
+.clone-modal-timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(210, 218, 232, 0.88);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.clone-modal-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.clone-btn,
+.clone-btn-primary {
+  min-width: 128px;
+  height: 44px;
+  border: none;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clone-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(238, 243, 252, 0.88);
+}
+
+.clone-btn:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(170, 178, 192, 0.46);
+  cursor: not-allowed;
+}
+
+.clone-btn-primary {
+  background: linear-gradient(135deg, #8c78ff, #6d88ff);
+  color: #fff;
+}
+
+.clone-review-card {
+  display: grid;
+  gap: 14px;
+}
+
+.clone-review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(232, 238, 249, 0.9);
+  font-size: 15px;
+}
+
+.clone-review-retry {
+  border: none;
+  background: transparent;
+  color: rgba(176, 184, 198, 0.76);
+  cursor: pointer;
+}
+
+.clone-name-input {
+  width: 100%;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 14px;
+  outline: none;
+}
+
+.clone-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: rgba(214, 220, 232, 0.84);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.clone-consent-row input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #7e63ff;
+}
+
+
+.voice-outline-btn,
+.voice-select-btn,
+.voice-icon-btn {
+  height: 36px;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.voice-outline-btn {
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(143, 121, 255, 0.42);
+  background: rgba(143, 121, 255, 0.08);
+  color: #bba8ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.voice-select-btn {
+  min-width: 88px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f7fd;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.voice-select-btn.selected {
+  background: linear-gradient(135deg, #7e63ff, #5b7dff);
+}
+
+.voice-icon-btn {
+  width: 36px;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(177, 185, 198, 0.82);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voice-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.voice-icon-btn.active {
+  color: #f5d98a;
+}
+
+.voice-copy-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 188px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(34, 37, 44, 0.98), rgba(24, 27, 33, 0.98));
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.34);
+  z-index: 12;
+}
+
+.voice-copy-btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(239, 243, 251, 0.94);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.voice-copy-btn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: rgba(233, 238, 247, 0.88);
+}
+
+.voice-copy-btn:hover {
+  background: rgba(143, 121, 255, 0.12);
+  color: #ffffff;
+}
+
+.filter-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 12, 0.74);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  z-index: 65;
+}
+
+.filter-modal.open {
+  display: flex;
+}
+
+.filter-panel {
+  width: min(760px, 100%);
+  max-height: min(720px, calc(100vh - 56px));
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 26, 31, 0.98), rgba(15, 17, 21, 0.98));
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.44);
+  overflow: auto;
+}
+
+.filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 14px;
+}
+
+.filter-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.filter-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(221, 226, 235, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.filter-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.filter-body {
+  padding: 6px 24px 24px;
+  display: grid;
+  gap: 22px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.filter-field {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(237, 242, 251, 0.92);
+}
+
+.filter-select {
+  width: 100%;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 14px;
+  outline: none;
+}
+
+.filter-segment {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.filter-segment-btn,
+.filter-chip {
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.filter-segment-btn {
+  height: 38px;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(191, 198, 211, 0.84);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.filter-segment-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-chip {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(191, 198, 211, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filter-chip.active {
+  border-color: rgba(143, 121, 255, 0.36);
+  background: rgba(143, 121, 255, 0.14);
+  color: #d7caff;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.filter-reset-btn,
+.filter-apply-btn {
+  min-width: 118px;
+  height: 42px;
+  border: none;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-reset-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(237, 242, 251, 0.88);
+}
+
+.filter-apply-btn {
+  background: linear-gradient(135deg, #7e63ff, #5b7dff);
+  color: #fff;
+}
+
+.register-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 12, 0.74);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  z-index: 80;
+}
+
+.register-modal.open {
+  display: flex;
+}
+
+.register-panel {
+  width: min(760px, 100%);
+  max-height: min(760px, calc(100vh - 56px));
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 26, 31, 0.98), rgba(15, 17, 21, 0.98));
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.44);
+  overflow: auto;
+}
+
+.register-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 14px;
+}
+
+.register-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.register-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(221, 226, 235, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.register-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.register-body {
+  padding: 8px 24px 24px;
+  display: grid;
+  gap: 20px;
+}
+
+.register-section {
+  display: grid;
+  gap: 10px;
+}
+
+.register-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.register-input,
+.register-textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  font: inherit;
+  outline: none;
+}
+
+.register-input {
+  height: 46px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.register-textarea {
+  min-height: 126px;
+  padding: 14px;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.register-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.register-tag-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.register-tag-pill,
+.register-tag-select-wrap {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2fb;
+  display: flex;
+  align-items: center;
+}
+
+.register-tag-pill {
+  padding: 0 14px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.register-tag-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.register-tag-close {
+  color: rgba(188, 196, 209, 0.74);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.register-tag-select-wrap {
+  position: relative;
+  padding-right: 36px;
+}
+
+.register-tag-select {
+  width: 100%;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: #edf2fb;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 14px;
+  outline: none;
+  appearance: none;
+}
+
+.register-tag-select option {
+  color: #171a22;
+}
+
+.register-tag-select.is-placeholder {
+  color: rgba(188, 196, 209, 0.6);
+}
+
+.register-tag-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(188, 196, 209, 0.74);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.register-chip {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 242, 251, 0.88);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.register-chip.scene {
+  cursor: pointer;
+}
+
+.register-chip.scene.active {
+  border-color: rgba(143, 121, 255, 0.34);
+  background: rgba(143, 121, 255, 0.14);
+  color: #d7caff;
+}
+
+.register-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.register-back,
+.register-save {
+  min-width: 118px;
+  height: 42px;
+  border: none;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.register-back {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(237, 242, 251, 0.88);
+}
+
+.register-save {
+  background: linear-gradient(135deg, #7e63ff, #5b7dff);
+  color: #fff;
+}
+
+.register-save:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(215, 223, 237, 0.5);
+  cursor: not-allowed;
+}
+
+.edit-voice-modal,
+.delete-voice-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 9, 14, 0.62);
+  backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 82;
+}
+
+.edit-voice-modal.open,
+.delete-voice-modal.open {
+  display: flex;
+}
+
+.edit-voice-panel,
+.delete-voice-panel {
+  width: min(540px, 100%);
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(26, 29, 35, 0.98), rgba(18, 21, 26, 0.98));
+  color: #eef2fb;
+  box-shadow: 0 28px 76px rgba(0, 0, 0, 0.42);
+}
+
+.edit-voice-panel {
+  padding: 22px 22px 22px;
+}
+
+.delete-voice-panel {
+  padding: 22px 22px 22px;
+}
+
+.edit-voice-head,
+.delete-voice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.edit-voice-title,
+.delete-voice-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.edit-voice-close,
+.delete-voice-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(188, 196, 209, 0.76);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.edit-voice-close:hover,
+.delete-voice-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f7fd;
+}
+
+.edit-voice-body {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.edit-voice-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(192, 200, 214, 0.82);
+}
+
+.edit-voice-input {
+  width: 100%;
+  height: 56px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef2fb;
+  font: inherit;
+  font-size: 18px;
+  padding: 0 18px;
+  outline: none;
+}
+
+.edit-voice-input:focus {
+  border-color: rgba(126, 99, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(126, 99, 255, 0.14);
+}
+
+.edit-voice-actions,
+.delete-voice-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.edit-voice-save,
+.delete-voice-cancel,
+.delete-voice-confirm {
+  min-width: 112px;
+  height: 46px;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-voice-save,
+.delete-voice-confirm {
+  background: linear-gradient(135deg, #7e63ff, #5c7cff);
+  color: #ffffff;
+}
+
+.edit-voice-save:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(215, 223, 237, 0.5);
+  cursor: not-allowed;
+}
+
+.delete-voice-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(237, 242, 251, 0.9);
+}
+
+.delete-voice-copy {
+  margin-top: 18px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: rgba(238, 242, 251, 0.92);
+}
+
+.toast {
+  position: fixed;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  min-width: 320px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: rgba(255, 248, 248, 0.96);
+  color: #586070;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 90;
+}
+
+.toast.open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #de3341;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-text {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.slider-stack {
+  display: grid;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.slider-group {
+  display: grid;
+  gap: 3px;
+}
+
+.slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.slider-name {
+  font-size: 12px;
+  color: rgba(232, 239, 253, 0.92);
+}
+
+.slider-side-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.value-chip {
+  min-width: 44px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 235, 251, 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--track);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.82);
+  border-radius: 50%;
+  background: #f8fbff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.82);
+  border-radius: 50%;
+  background: #f8fbff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+}
+
+.tone-slider-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  gap: 6px;
+  align-items: center;
+}
+
+.mini-value {
+  height: 20px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.switch-list {
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.switch-item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.switch-item-label {
+  font-size: 12px;
+  color: rgba(236, 242, 255, 0.92);
+}
+
+.switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 0.18s ease;
+}
+
+.switch.on {
+  background: var(--blue);
+}
+
+.switch.on::after {
+  transform: translateX(14px);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 1100px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-main {
+    margin-right: 0;
+    justify-content: flex-start;
+  }
+
+  .toolbar-right {
+    justify-content: flex-end;
+  }
+
+  .dropdown-trigger.primary {
+    min-width: 0;
+    width: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    padding: 18px 10px 36px;
+  }
+
+  .composer {
+    padding: 20px 18px 14px;
+  }
+
+  .toolbar {
+    padding: 16px 18px 18px;
+  }
+
+  .input-box {
+    min-height: 160px;
+    font-size: 16px;
+  }
+
+  .chip,
+  .dropdown-trigger,
+  .counter,
+  .credit {
+    font-size: 15px;
+  }
+
+  .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-divider {
+    display: none;
+  }
+
+  .longmode-inline {
+    order: 2;
+  }
+
+  .counter {
+    order: 3;
+  }
+
+  .settings-panel {
+    padding: 18px 18px 20px;
+  }
+
+  .settings-card {
+    padding: 14px;
+  }
+
+  .voice-current {
+    padding: 18px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .voice-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .voice-name {
+    font-size: 16px;
+  }
+
+  .voice-list {
+    grid-template-columns: 1fr;
+  }
+
+  .slider-head,
+  .section-head {
+    align-items: flex-start;
+  }
+
+  .slider-head {
+    flex-direction: column;
+  }
+
+  .tone-slider-row {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    gap: 10px;
+  }
+
+  .counter {
+    min-width: 0;
+  }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="generator">
+    <div class="composer">
+      <div class="textarea-wrap">
+        <label class="sr-only" for="ttsInput">输入要合成的文本</label>
+        <textarea id="ttsInput" class="input-box" placeholder="描述信息"></textarea>
+        <button class="expand-btn" type="button" title="展开输入框">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M14 4h6v6M20 4l-7.2 7.2M10 20H4v-6M4 20l7.2-7.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="resize-mark">//</div>
+      </div>
+      <div class="micro-controls">
+        <button class="micro-btn" id="emotionBtn" type="button" title="给选中文本添加情绪，让语音表达更生动" disabled>＋ 情绪</button>
+        <div class="micro-separator"></div>
+        <button class="micro-btn" id="pauseBtn" type="button" title="在文中插入停顿，精准掌控音频节奏，支持选择预设时长或直接输入秒数">&lt;#&gt; 停顿</button>
+        <button class="micro-btn" id="interjectionBtn" type="button" title="点击插入或输入生动的语气词，让语音更具感染力 系统仅支持预设库内的语气词标签">（）语气词</button>
+      </div>
+      <div class="micro-popover" id="microPopover"></div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-main">
+        <div class="dropdown" id="taskDropdown">
+          <button class="dropdown-trigger task" type="button" data-dropdown-trigger="taskDropdown">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3v18M7.5 8.5v7a4.5 4.5 0 1 0 9 0v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <span>文字转语音</span>
+            <span class="arrow">▾</span>
+          </button>
+          <div class="dropdown-menu">
+            <button class="model-option active" type="button">
+              <span class="model-option-name">文字转语音</span>
+              <span class="model-option-desc">基于文本生成自然语音</span>
+            </button>
+            <button class="model-option" type="button">
+              <span class="model-option-name">音频二创</span>
+              <span class="model-option-desc">保留底稿结构，延展音频表现</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="dropdown" id="modelDropdown">
+          <button class="dropdown-trigger primary" type="button" data-dropdown-trigger="modelDropdown">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3.5 18.5 7v10L12 20.5 5.5 17V7L12 3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M12 3.5V11m0 0L5.5 7M12 11l6.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="dropdown-label">
+              <span class="dropdown-title" id="modelTriggerName">Minimax-speech-2.8-hd</span>
+              <span class="dropdown-subtitle" id="modelTriggerDesc">高清音质</span>
+            </span>
+            <span class="arrow">▾</span>
+          </button>
+          <div class="dropdown-menu" id="modelMenu"></div>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <button class="icon-pill" id="translateBtn" type="button" title="将中文翻译成英文">
+          <span class="translate-glyph" aria-hidden="true">
+            <i class="translate-glyph-zh">文</i>
+            <i class="translate-glyph-en">A</i>
+          </span>
+        </button>
+
+        <button class="icon-pill active" id="settingsBtn" type="button" title="打开设置">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h6M14 7h6M4 17h10M18 17h2M10 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm8 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM15 12h5M4 12h7M13 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+        <div class="longmode-inline">
+          <span class="longmode-inline-label">长文模式</span>
+          <button class="longmode-toggle" id="longModeToggle" type="button" role="switch" aria-checked="false" title="开启长文本模式后，最多支持生成 20 万字符的音频，但需要更长的等待时间"></button>
+        </div>
+
+        <div class="toolbar-divider" aria-hidden="true"></div>
+
+        <div class="counter"><span id="charCount">0</span>/5000</div>
+
+        <div class="credit"><strong>⚡</strong><span>1</span></div>
+
+        <button class="send-btn" id="sendBtn" type="button" title="开始合成">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M12 19V5M12 5 6.5 10.5M12 5l5.5 5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-panel open" id="settingsPanel">
+      <div class="settings-card">
+        <div class="settings-title">音色</div>
+
+        <section class="panel-section">
+          <div class="section-shell" id="voiceSection">
+            <div class="section-body" style="padding: 0;">
+              <div class="voice-current" id="voiceCurrentCard">
+                <div class="voice-current-left">
+                  <div class="voice-icon">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+                      <path d="M14.5 7.5a5 5 0 0 1 0 9M17.5 5a8.5 8.5 0 0 1 0 14M4 14.5h3l4 4v-13l-4 4H4z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                  <div class="voice-meta">
+                    <div class="voice-name-row">
+                      <div class="voice-name" id="voiceName">Coco Li</div>
+                      <button class="voice-name-copy" id="copyCurrentVoiceNameBtn" type="button" title="复制音色名称">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <rect x="9" y="9" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                          <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                      <div class="section-tag status" id="voiceEffectBadge">叠加效果器</div>
+                    </div>
+                    <div class="voice-desc" id="voiceDesc">平静、年轻、可信赖</div>
+                  </div>
+                </div>
+
+                <div class="voice-actions">
+                  <div class="lang-dropdown" id="langDropdown">
+                    <button class="lang-trigger" type="button" id="langTrigger">
+                      <span id="langLabel">中文-普通话</span>
+                      <span class="arrow">▾</span>
+                    </button>
+                    <div class="lang-menu" id="langMenu"></div>
+                  </div>
+                  <span class="arrow" style="font-size:18px;">▾</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-shell expanded" id="basicSection">
+            <div class="section-head">
+              <div class="section-title-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color: var(--blue);">
+                  <path d="M4 7h7M15 7h5M4 17h10M18 17h2M11 12h9M4 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <circle cx="13" cy="7" r="2" stroke="currentColor" stroke-width="1.8"/>
+                  <circle cx="8" cy="12" r="2" stroke="currentColor" stroke-width="1.8"/>
+                  <circle cx="16" cy="17" r="2" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+                <div class="section-title">基础调节</div>
+              </div>
+
+              <div class="section-actions">
+                <button class="reset-link" type="button" id="resetBasicBtn">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                    <path d="M15.5 5.5V2.8M15.5 2.8h-2.7M15.5 2.8l-2.8 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M15 10A6 6 0 1 1 10 4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                  <span>重置</span>
+                </button>
+                <button class="collapse-btn" type="button" data-collapse="basic">
+                  <span class="chevron"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="section-body">
+              <div class="slider-stack" id="basicSliderStack"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-shell expanded" id="advancedSection">
+            <div class="section-head">
+              <div class="section-title-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="color: #7db3ff;">
+                  <path d="m12 3 1.5 4.7L18 9.2l-4.5 1.4L12 15l-1.5-4.4L6 9.2l4.5-1.5L12 3ZM19 14l.8 2.4L22 17l-2.2.7L19 20l-.8-2.3L16 17l2.2-.6L19 14ZM6 14l.8 2.4L9 17l-2.2.7L6 20l-.8-2.3L3 17l2.2-.6L6 14Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                </svg>
+                <div class="section-title">音色效果调节</div>
+                <div class="section-tag">高级</div>
+                <div class="section-tag status" id="advancedStatusBadge">已启用</div>
+              </div>
+
+              <div class="section-actions">
+                <button class="reset-link" type="button" id="resetAdvancedBtn">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                    <path d="M15.5 5.5V2.8M15.5 2.8h-2.7M15.5 2.8l-2.8 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M15 10A6 6 0 1 1 10 4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                  <span>重置</span>
+                </button>
+                <button class="collapse-btn" type="button" data-collapse="advanced">
+                  <span class="chevron"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="section-body">
+              <div class="slider-stack" id="advancedSliderStack"></div>
+              <div class="switch-list" id="effectSwitchList"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="voice-modal" id="voiceModal">
+  <div class="voice-modal-panel">
+    <div class="voice-modal-head">
+      <div class="voice-modal-title">音色选择</div>
+      <button class="voice-modal-close" id="voiceModalClose" type="button" title="关闭音色弹窗">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="voice-modal-body">
+      <div class="voice-tabs" id="voiceTabs">
+        <button class="voice-tab active" type="button" data-voice-tab="library">音色库</button>
+        <button class="voice-tab" type="button" data-voice-tab="mine">我的音色</button>
+        <button class="voice-tab" type="button" data-voice-tab="favorites">收藏音色</button>
+      </div>
+
+      <div class="voice-toolbar">
+        <label class="voice-search">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/>
+            <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <input id="voiceSearchInput" type="text" placeholder="搜索语音库">
+        </label>
+
+        <button class="voice-filter-btn" id="openFilterBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span>筛选</span>
+        </button>
+      </div>
+
+      <div class="voice-filter-summary" id="voiceFilterSummary"></div>
+
+      <div class="voice-library-list" id="voiceLibraryList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="filter-modal" id="filterModal">
+  <div class="filter-panel">
+    <div class="filter-head">
+      <div class="filter-title">语音筛选</div>
+      <button class="filter-close" id="filterModalClose" type="button" title="关闭筛选">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="filter-body">
+      <div class="filter-grid">
+        <label class="filter-field">
+          <span class="filter-label">语言</span>
+          <select class="filter-select" id="filterLanguageSelect"></select>
+        </label>
+        <label class="filter-field">
+          <span class="filter-label">口音</span>
+          <select class="filter-select" id="filterAccentSelect"></select>
+        </label>
+      </div>
+
+      <div class="filter-field">
+        <span class="filter-label">性别</span>
+        <div class="filter-segment" id="filterGenderSegment"></div>
+      </div>
+
+      <div class="filter-field">
+        <span class="filter-label">年龄</span>
+        <div class="filter-chip-row" id="filterAgeRow"></div>
+      </div>
+
+      <div class="filter-actions">
+        <button class="filter-reset-btn" id="filterResetBtn" type="button">重置所有</button>
+        <button class="filter-apply-btn" id="filterApplyBtn" type="button">筛选</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="cloneToast">
+  <div class="toast-icon">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="toast-text" id="cloneToastText">录音时长需在 10 秒到 60 秒之间</div>
+</div>
+
+<div class="register-modal" id="registerModal">
+  <div class="register-panel">
+    <div class="register-head">
+      <div class="register-title">音色登记</div>
+      <button class="register-close" id="registerModalClose" type="button" title="关闭音色登记">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="register-body">
+      <div class="register-section" id="registerNameSection">
+        <div class="register-label">音色名称</div>
+        <input class="register-input" id="registerNameInput" type="text" placeholder="输入你的专属音色名称">
+      </div>
+
+      <div class="register-section" id="registerTagSection">
+        <div class="register-label">标签</div>
+        <div class="register-chip-row" id="registerTagRow"></div>
+      </div>
+
+      <div class="register-section" id="registerDescSection">
+        <div class="register-label">音色描述</div>
+        <textarea class="register-textarea" id="registerDescInput" placeholder="请输入音色描述"></textarea>
+      </div>
+
+      <div class="register-actions" id="registerActions">
+        <button class="register-back" id="registerBackBtn" type="button">返回</button>
+        <button class="register-save" id="registerSaveBtn" type="button">保存音色</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="leave-confirm-modal" id="leaveConfirmModal">
+  <div class="leave-confirm-panel">
+    <div class="leave-confirm-head">
+      <div class="leave-confirm-title">确定离开这个页面吗？</div>
+      <button class="leave-confirm-close" id="leaveConfirmClose" type="button" title="关闭确认弹窗">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="leave-confirm-body">如果现在离开，您当前的编辑都不会被保存</div>
+    <div class="leave-confirm-actions">
+      <button class="leave-confirm-btn" id="leaveConfirmCancel" type="button">取消</button>
+      <button class="leave-confirm-btn-primary" id="leaveConfirmSubmit" type="button">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="edit-voice-modal" id="editVoiceModal">
+  <div class="edit-voice-panel">
+    <div class="edit-voice-head">
+      <div class="edit-voice-title">编辑</div>
+      <button class="edit-voice-close" id="editVoiceModalClose" type="button" title="关闭编辑弹窗">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="edit-voice-body">
+      <div class="edit-voice-label">音色名</div>
+      <input class="edit-voice-input" id="editVoiceNameInput" type="text" placeholder="请输入音色名称">
+    </div>
+    <div class="edit-voice-actions">
+      <button class="edit-voice-save" id="editVoiceSaveBtn" type="button">保存音色</button>
+    </div>
+  </div>
+</div>
+
+<div class="delete-voice-modal" id="deleteVoiceModal">
+  <div class="delete-voice-panel">
+    <div class="delete-voice-head">
+      <div class="delete-voice-title">删除音色</div>
+      <button class="delete-voice-close" id="deleteVoiceModalClose" type="button" title="关闭删除确认">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="delete-voice-copy" id="deleteVoiceCopy">您确定要删除这个音色吗？此操作无法撤销</div>
+    <div class="delete-voice-actions">
+      <button class="delete-voice-cancel" id="deleteVoiceCancelBtn" type="button">取消</button>
+      <button class="delete-voice-confirm" id="deleteVoiceConfirmBtn" type="button">删除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const modelOptions = [
+  {
+    id: 'hd',
+    name: 'Minimax-speech-2.8-hd',
+    desc: '高清音质'
+  },
+  {
+    id: 'hd-turbo',
+    name: 'Minimax-speech-2.8-hd-turbo',
+    desc: '快速生成'
+  }
+];
+
+const languages = [
+  { id: 'zh', label: '中文', detectLabel: '中文-普通话' },
+  { id: 'zh-yue', label: '粤语', detectLabel: '中文-粤语' },
+  { id: 'en', label: 'English', detectLabel: '英语' },
+  { id: 'jp', label: '日本語', detectLabel: '日语' },
+  { id: 'fr', label: 'Français', detectLabel: '法语' },
+  { id: 'de', label: 'Deutsch', detectLabel: '德语' }
+];
+
+const cloneTextOptions = [
+  {
+    id: 'zh',
+    label: '中文-普通话',
+    text: '您好，很高兴能为您提供配音服务。选择您感兴趣的音色，让我们一起开启声音创作的奇幻之旅吧。'
+  },
+  {
+    id: 'zh-yue',
+    label: '中文-粤语',
+    text: '你好，好高兴为你提供配音服务。拣你中意嘅音色，一齐展开一段声音创作之旅。'
+  },
+  {
+    id: 'en',
+    label: '英语',
+    text: 'Hello, I am delighted to provide voice-over service for you. Pick a voice you like and let us begin a wonderful audio creation journey together.'
+  },
+  {
+    id: 'fr',
+    label: '法语',
+    text: 'Bonjour, je suis ravi de vous proposer ce service de voix off. Choisissez une voix qui vous plaît et commençons ensemble un merveilleux voyage de création sonore.'
+  },
+  {
+    id: 'de',
+    label: '德语',
+    text: 'Hallo, ich freue mich, Ihnen diesen Voice-over-Service anbieten zu dürfen. Wählen Sie eine Stimme, die Ihnen gefällt, und starten wir gemeinsam eine klangvolle Kreativreise.'
+  }
+];
+
+const voices = [
+  {
+    id: 'coco-li',
+    name: 'Coco Li',
+    subtitle: 'myself',
+    desc: '平静、年轻、可信赖',
+    languages: ['zh'],
+    accent: '粤语',
+    gender: 'female',
+    age: 'youth',
+    tags: ['推荐', '温和'],
+    libraryTags: ['职业粤语女声'],
+    mine: true,
+    favorite: true
+  },
+  {
+    id: 'arden-xu',
+    name: 'Arden Xu',
+    subtitle: 'narrator',
+    desc: '知性、沉稳、叙述感强',
+    languages: ['zh', 'en'],
+    accent: '普通话',
+    gender: 'male',
+    age: 'adult',
+    tags: ['故事感'],
+    libraryTags: ['沉浸式剧情配音'],
+    mine: true,
+    favorite: false
+  },
+  {
+    id: 'mika-lin',
+    name: 'Mika Lin',
+    subtitle: 'broadcast',
+    desc: '轻快、清透、适合播报',
+    languages: ['zh', 'jp'],
+    accent: '普通话',
+    gender: 'female',
+    age: 'youth',
+    tags: ['清亮'],
+    libraryTags: ['磁性阳光男青年'],
+    mine: false,
+    favorite: true
+  },
+  {
+    id: 'ryan-chen',
+    name: 'Ryan Chen',
+    subtitle: 'deep tone',
+    desc: '磁性、中低频、存在感强',
+    languages: ['zh', 'en'],
+    accent: '美式英语',
+    gender: 'male',
+    age: 'adult',
+    tags: ['男声'],
+    libraryTags: ['磁性阳光男青年'],
+    mine: false,
+    favorite: false
+  },
+  {
+    id: 'hana',
+    name: 'Hana',
+    subtitle: 'soft companion',
+    desc: '日系温柔，适合陪伴式表达',
+    languages: ['jp'],
+    accent: '日语',
+    gender: 'female',
+    age: 'youth',
+    tags: ['日语', '柔和'],
+    libraryTags: ['沉浸式剧情配音'],
+    mine: false,
+    favorite: false
+  },
+  {
+    id: 'vera',
+    name: 'Vera',
+    subtitle: 'brand voice',
+    desc: '国际化腔调，适合品牌解说',
+    languages: ['en'],
+    accent: '英式英语',
+    gender: 'female',
+    age: 'adult',
+    tags: ['英文', '品牌'],
+    libraryTags: ['职业粤语女声'],
+    mine: true,
+    favorite: false
+  }
+];
+
+const emptyVoiceFilters = () => ({
+  language: '',
+  accent: '',
+  gender: 'all',
+  age: ''
+});
+
+const genderOptions = [
+  { id: 'all', label: '全部' },
+  { id: 'male', label: '男' },
+  { id: 'female', label: '女' }
+];
+
+const ageOptions = [
+  { id: 'child', label: '儿童' },
+  { id: 'youth', label: '青年' },
+  { id: 'adult', label: '中年' },
+  { id: 'senior', label: '老年' }
+];
+
+const defaults = {
+  model: 'hd',
+  text: '',
+  longTextMode: false,
+  selectionStart: 0,
+  selectionEnd: 0,
+  microPopoverOpen: false,
+  microPopoverType: null,
+  pauseTokenRange: null,
+  language: 'zh',
+  voice: 'coco-li',
+  voiceModalOpen: false,
+  voiceTab: 'mine',
+  voiceSearch: '',
+  voiceActionMenuId: null,
+  filterModalOpen: false,
+  voiceFilters: emptyVoiceFilters(),
+  draftVoiceFilters: emptyVoiceFilters(),
+  registerModalOpen: false,
+  registerGender: '',
+  editVoiceModalOpen: false,
+  editVoiceId: null,
+  editVoiceName: '',
+  deleteVoiceModalOpen: false,
+  pendingDeleteVoiceId: null,
+  cloneLeaveConfirmOpen: false,
+  cloneToastOpen: false,
+  cloneToastMessage: '录音时长需在 10 秒到 60 秒之间',
+  cloneView: 'list',
+  cloneGeneratedResult: null,
+  cloneRecording: false,
+  cloneElapsedSec: 0,
+  cloneTextLanguage: 'zh',
+  cloneSamples: [],
+  cloneDenoise: false,
+  cloneConsent: false,
+  cloneName: '',
+  cloneDescription: '',
+  cloneSlotsRemaining: 7,
+  pendingCloneVoices: [],
+  settingsOpen: true,
+  modelMenuOpen: false,
+  taskMenuOpen: false,
+  langMenuOpen: false,
+  collapsedBasic: false,
+  collapsedAdvanced: false,
+  basic: {
+    speed: 0.97,
+    pitch: 0,
+    volume: 1
+  },
+  advanced: {
+    brightness: 0,
+    power: 0,
+    presence: 0,
+    effects: {
+      echo: true,
+      hall: false,
+      phone: false,
+      radio: false
+    }
+  }
+};
+
+const state = structuredClone(defaults);
+state.recording = false;
+
+let recognitionSession = null;
+let recordingFallbackTimer = null;
+let cloneRecordingInterval = null;
+let cloneToastTimer = null;
+
+const basicSliderMeta = [
+  { key: 'speed', label: '语速', min: 0.5, max: 2, step: 0.01, format: value => value.toFixed(2) },
+  { key: 'pitch', label: '音调', min: -12, max: 12, step: 1, format: value => String(value) },
+  { key: 'volume', label: '音量', min: 0, max: 2, step: 0.01, format: value => value.toFixed(value % 1 === 0 ? 0 : 2) }
+];
+
+const advancedSliderMeta = [
+  { key: 'brightness', label: '低沉', rightLabel: '明亮', min: -10, max: 10, step: 1, valueFormat: value => `${value > 0 ? '+' : ''}${value}` },
+  { key: 'power', label: '力量感', rightLabel: '柔和', min: -10, max: 10, step: 1, valueFormat: value => `${value > 0 ? '+' : ''}${value}` },
+  { key: 'presence', label: '磁性', rightLabel: '清脆', min: -10, max: 10, step: 1, valueFormat: value => `${value > 0 ? '+' : ''}${value}` }
+];
+
+const effectMeta = [
+  { key: 'echo', label: '空旷回声' },
+  { key: 'hall', label: '礼堂广播' },
+  { key: 'phone', label: '电话失真' },
+  { key: 'radio', label: '电音' }
+];
+
+function getVoiceOptions() {
+  return voices.filter((voice) => voice.languages.includes(state.language));
+}
+
+function getLanguageMeta(id) {
+  return languages.find((item) => item.id === id);
+}
+
+function getSelectedVoice() {
+  const available = getVoiceOptions();
+  const match = available.find((voice) => voice.id === state.voice);
+  return match || available[0] || voices[0];
+}
+
+function getVoiceById(id) {
+  return voices.find((voice) => voice.id === id) || null;
+}
+
+function matchesVoiceFiltersAndSearch(voice) {
+  const keyword = state.voiceSearch.trim().toLowerCase();
+  const filters = state.voiceFilters;
+  const languageMatched = voice.languages.includes(state.language);
+  if (!languageMatched) return false;
+
+  if (filters.language && !voice.languages.includes(filters.language)) return false;
+  if (filters.accent && voice.accent !== filters.accent) return false;
+  if (filters.gender !== 'all' && voice.gender !== filters.gender) return false;
+  if (filters.age && voice.age !== filters.age) return false;
+
+  if (!keyword) return true;
+
+  const haystack = [
+    voice.name,
+    voice.subtitle,
+    voice.desc,
+    ...(voice.tags || []),
+    ...(voice.libraryTags || [])
+  ].join(' ').toLowerCase();
+
+  return haystack.includes(keyword);
+}
+
+function getVisibleVoices() {
+  return voices.filter((voice) => {
+    if (state.voiceTab === 'mine' && !voice.mine) return false;
+    if (state.voiceTab === 'favorites' && !voice.favorite) return false;
+    return matchesVoiceFiltersAndSearch(voice);
+  });
+}
+
+function getMineVoices() {
+  return voices.filter((voice) => voice.mine && matchesVoiceFiltersAndSearch(voice));
+}
+
+function getVisiblePendingCloneVoices() {
+  const keyword = state.voiceSearch.trim().toLowerCase();
+  const filters = state.voiceFilters;
+
+  return state.pendingCloneVoices.filter((voice) => {
+    if (voice.language !== state.language) return false;
+    if (filters.language && voice.language !== filters.language) return false;
+
+    if (filters.accent || filters.gender !== 'all' || filters.age) {
+      return false;
+    }
+
+    if (!keyword) return true;
+
+    const languageLabel = getLanguageMeta(voice.language)?.detectLabel || getLanguageMeta(voice.language)?.label || voice.language;
+    return [voice.name, languageLabel, '我的音色', '生成中'].join(' ').toLowerCase().includes(keyword);
+  });
+}
+
+function getCloneTextMeta() {
+  return cloneTextOptions.find((item) => item.id === state.cloneTextLanguage) || cloneTextOptions[0];
+}
+
+function getRegisterTags() {
+  return [
+    cloneTextOptions.find((item) => item.id === state.cloneTextLanguage)?.label || '中文-普通话'
+  ];
+}
+
+function formatTime(totalSec) {
+  const minutes = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const seconds = String(totalSec % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function resetCloneComposer() {
+  state.cloneView = 'list';
+  state.cloneGeneratedResult = null;
+  state.cloneRecording = false;
+  state.cloneElapsedSec = 0;
+  state.cloneSamples = [];
+  state.cloneDenoise = false;
+  state.cloneConsent = false;
+  state.cloneName = '';
+  state.cloneDescription = '';
+  state.registerGender = '';
+  state.registerModalOpen = false;
+}
+
+function hasCloneDraftChanges() {
+  return state.cloneRecording || state.cloneSamples.length > 0;
+}
+
+function openCloneView() {
+  if (state.cloneSlotsRemaining <= 0) return;
+  if (cloneRecordingInterval) {
+    clearInterval(cloneRecordingInterval);
+    cloneRecordingInterval = null;
+  }
+  state.cloneView = 'clone';
+  state.cloneGeneratedResult = null;
+  state.cloneRecording = false;
+  state.cloneElapsedSec = 0;
+  state.cloneTextLanguage = state.language;
+  state.cloneSamples = [];
+  state.cloneDenoise = false;
+  state.cloneConsent = false;
+  state.cloneName = '';
+  state.cloneDescription = '';
+  state.registerGender = '';
+  state.registerModalOpen = false;
+  state.cloneLeaveConfirmOpen = false;
+}
+
+function leaveCloneView() {
+  if (cloneRecordingInterval) {
+    clearInterval(cloneRecordingInterval);
+    cloneRecordingInterval = null;
+  }
+  state.cloneRecording = false;
+  state.cloneElapsedSec = 0;
+  state.cloneView = 'list';
+  state.cloneGeneratedResult = null;
+  state.cloneLeaveConfirmOpen = false;
+}
+
+function closeRegisterModal() {
+  state.registerModalOpen = false;
+}
+
+function closeEditVoiceModal() {
+  state.editVoiceModalOpen = false;
+  state.editVoiceId = null;
+  state.editVoiceName = '';
+}
+
+function closeDeleteVoiceModal() {
+  state.deleteVoiceModalOpen = false;
+  state.pendingDeleteVoiceId = null;
+}
+
+function playVoicePreview(voiceId) {
+  const voice = getVoiceById(voiceId);
+  if (!voice) {
+    return;
+  }
+  showCloneToast(`正在播放 ${voice.name} 的录音预览`);
+}
+
+function requestLeaveCloneView() {
+  if (!hasCloneDraftChanges()) {
+    leaveCloneView();
+    renderVoiceModal();
+    return;
+  }
+
+  state.cloneLeaveConfirmOpen = true;
+  renderLeaveConfirmModal();
+}
+
+function finishCloneRecording() {
+  if (!state.cloneRecording) return;
+  if (cloneRecordingInterval) {
+    clearInterval(cloneRecordingInterval);
+    cloneRecordingInterval = null;
+  }
+  const duration = Math.max(state.cloneElapsedSec, 10);
+  state.cloneRecording = false;
+  state.cloneElapsedSec = 0;
+  state.cloneSamples = [
+    ...state.cloneSamples,
+    {
+      id: `sample-${Date.now()}`,
+      name: `record-${Date.now()}.wav`,
+      duration
+    }
+  ].slice(0, 3);
+  state.cloneDenoise = state.cloneSamples.length > 0;
+}
+
+function generateCloneResultPreview() {
+  state.cloneGeneratedResult = {
+    id: `clone-preview-${Date.now()}`,
+    title: '音色预览',
+    subtitle: ''
+  };
+  state.cloneView = 'clone';
+}
+
+function ensureVoiceValidity() {
+  const available = getVoiceOptions();
+  if (!available.some((voice) => voice.id === state.voice) && available.length) {
+    state.voice = available[0].id;
+  }
+}
+
+function clampVoiceTextLength() {
+  const limit = getTextLimit();
+  if (state.text.length > limit) {
+    state.text = state.text.slice(0, limit);
+  }
+}
+
+function translateTextToEnglish(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return text;
+  }
+
+  const exactMap = {
+    '欢迎使用语音合成系统，这是一段示例文本。': 'Welcome to the speech synthesis system. This is a sample text.',
+    '欢迎使用语音合成系统，这是一段示例文本': 'Welcome to the speech synthesis system. This is a sample text.',
+    '你好，欢迎使用语音合成系统。': 'Hello, welcome to the speech synthesis system.',
+    '你好，欢迎使用语音合成系统': 'Hello, welcome to the speech synthesis system.'
+  };
+
+  if (exactMap[trimmed]) {
+    return exactMap[trimmed];
+  }
+
+  if (!/[\u4e00-\u9fff\u3040-\u30ff]/.test(trimmed)) {
+    return trimmed;
+  }
+
+  let translated = trimmed
+    .replace(/欢迎使用语音合成系统/g, 'Welcome to the speech synthesis system')
+    .replace(/这是一段示例文本/g, 'this is a sample text')
+    .replace(/这是一段/g, 'this is a')
+    .replace(/示例文本/g, 'sample text')
+    .replace(/你好/g, 'hello')
+    .replace(/请/g, 'please')
+    .replace(/将/g, '')
+    .replace(/把/g, '')
+    .replace(/文本/g, 'text')
+    .replace(/翻译成英文/g, 'translate into English')
+    .replace(/翻译/g, 'translate')
+    .replace(/英文/g, 'English')
+    .replace(/中文-普通话/g, 'Mandarin Chinese')
+    .replace(/中文/g, 'Chinese')
+    .replace(/普通话/g, 'Mandarin')
+    .replace(/语言/g, 'language')
+    .replace(/语音/g, 'speech')
+    .replace(/音频/g, 'audio')
+    .replace(/生成/g, 'generate')
+    .replace(/设置/g, 'set')
+    .replace(/确认/g, 'confirm')
+    .replace(/忽略/g, 'ignore')
+    .replace(/检测/g, 'detect')
+    .replace(/自动/g, 'automatic')
+    .replace(/日本語/g, 'Japanese')
+    .replace(/日语/g, 'Japanese')
+    .replace(/。/g, '. ')
+    .replace(/，/g, ', ')
+    .replace(/！/g, '! ')
+    .replace(/？/g, '? ');
+
+  translated = translated
+    .replace(/\s+/g, ' ')
+    .replace(/\s([,.!?])/g, '$1')
+    .trim();
+
+  if (!/[.!?]$/.test(translated)) {
+    translated += '.';
+  }
+
+  translated = translated.charAt(0).toUpperCase() + translated.slice(1);
+  return translated;
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+  }
+
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return copied;
+  } catch (error) {
+    return false;
+  }
+}
+
+function getTextLimit() {
+  return state.longTextMode ? 200000 : 5000;
+}
+
+function getSelectedText() {
+  return state.text.slice(state.selectionStart, state.selectionEnd);
+}
+
+function replaceTextRange(start, end, nextText, nextCaret = null) {
+  state.text = `${state.text.slice(0, start)}${nextText}${state.text.slice(end)}`;
+  clampVoiceTextLength();
+  const caret = nextCaret == null ? start + nextText.length : nextCaret;
+  state.selectionStart = caret;
+  state.selectionEnd = caret;
+}
+
+function insertAtCursor(text) {
+  replaceTextRange(state.selectionStart, state.selectionEnd, text);
+}
+
+function closeMicroPopover() {
+  state.microPopoverOpen = false;
+  state.microPopoverType = null;
+  state.pauseTokenRange = null;
+}
+
+function openMicroPopover(type) {
+  state.microPopoverType = type;
+  state.microPopoverOpen = true;
+}
+
+function showCloneToast(message) {
+  state.cloneToastMessage = message;
+  state.cloneToastOpen = true;
+  renderCloneToast();
+  if (cloneToastTimer) {
+    clearTimeout(cloneToastTimer);
+  }
+  cloneToastTimer = window.setTimeout(() => {
+    state.cloneToastOpen = false;
+    renderCloneToast();
+  }, 2200);
+}
+
+function updateRangeTrack(input) {
+  const min = Number(input.min);
+  const max = Number(input.max);
+  const value = Number(input.value);
+  const ratio = ((value - min) / (max - min)) * 100;
+  input.style.background = `linear-gradient(90deg, ${getComputedStyle(document.documentElement).getPropertyValue('--blue').trim()} 0%, ${getComputedStyle(document.documentElement).getPropertyValue('--blue').trim()} ${ratio}%, rgba(104, 123, 161, 0.26) ${ratio}%, rgba(104, 123, 161, 0.26) 100%)`;
+}
+
+function renderModelMenu() {
+  const menu = document.getElementById('modelMenu');
+  const selected = modelOptions.find((item) => item.id === state.model) || modelOptions[0];
+  document.getElementById('modelTriggerName').textContent = selected.name;
+  document.getElementById('modelTriggerDesc').textContent = selected.desc;
+  document.getElementById('modelDropdown').classList.toggle('open', state.modelMenuOpen);
+  menu.innerHTML = modelOptions.map((item) => `
+    <button class="model-option ${item.id === state.model ? 'active' : ''}" type="button" data-model-option="${item.id}">
+      <span class="model-option-name">${item.name}</span>
+      <span class="model-option-desc">${item.desc}</span>
+    </button>
+  `).join('');
+}
+
+function renderLanguageMenu() {
+  const dropdown = document.getElementById('langDropdown');
+  const menu = document.getElementById('langMenu');
+  const label = getLanguageMeta(state.language)?.detectLabel || getLanguageMeta(state.language)?.label || '中文-普通话';
+  document.getElementById('langLabel').textContent = label;
+  dropdown.classList.toggle('open', state.langMenuOpen);
+  menu.innerHTML = languages.map((item) => `
+    <button class="lang-option ${item.id === state.language ? 'active' : ''}" type="button" data-lang-option="${item.id}">${item.detectLabel || item.label}</button>
+  `).join('');
+}
+
+function getRecognitionLang() {
+  if (state.language === 'en') return 'en-US';
+  if (state.language === 'jp') return 'ja-JP';
+  return 'zh-CN';
+}
+
+function appendRecognizedText(text) {
+  const normalized = text.trim();
+  if (!normalized) return;
+  state.text = state.text.trim() ? `${state.text.trim()}\n${normalized}` : normalized;
+  clampVoiceTextLength();
+  render();
+}
+
+function stopRecording(resetOnly = false) {
+  state.recording = false;
+
+  if (recordingFallbackTimer) {
+    clearTimeout(recordingFallbackTimer);
+    recordingFallbackTimer = null;
+  }
+
+  if (recognitionSession) {
+    const current = recognitionSession;
+    recognitionSession = null;
+    if (!resetOnly) {
+      try {
+        current.stop();
+      } catch (error) {
+      }
+    }
+  }
+
+  renderRecordingState();
+}
+
+function startRecording() {
+  if (state.recording) {
+    stopRecording();
+    return;
+  }
+
+  state.recording = true;
+  renderRecordingState();
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+    recognition.lang = getRecognitionLang();
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+    recognitionSession = recognition;
+
+    recognition.addEventListener('result', (event) => {
+      const transcript = Array.from(event.results || [])
+        .map((result) => result[0]?.transcript || '')
+        .join(' ')
+        .trim();
+      appendRecognizedText(transcript);
+    });
+
+    recognition.addEventListener('end', () => {
+      recognitionSession = null;
+      stopRecording(true);
+    });
+
+    recognition.addEventListener('error', () => {
+      recognitionSession = null;
+      stopRecording(true);
+      window.alert('当前浏览器语音识别不可用，已切换为原型演示录音。');
+      recordingFallbackTimer = window.setTimeout(() => {
+        appendRecognizedText('This is a voice recording demo converted to text.');
+        stopRecording(true);
+      }, 1200);
+      state.recording = true;
+      renderRecordingState();
+    });
+
+    try {
+      recognition.start();
+      return;
+    } catch (error) {
+      recognitionSession = null;
+    }
+  }
+
+  recordingFallbackTimer = window.setTimeout(() => {
+    const fallbackText = state.language === 'en'
+      ? 'This is a voice recording demo converted to text.'
+      : state.language === 'jp'
+        ? 'これは録音デモから変換されたテキストです。'
+        : '这是一段录音演示转写文本。';
+    appendRecognizedText(fallbackText);
+    stopRecording(true);
+  }, 1200);
+}
+
+function renderRecordingState() {
+  const recordBtn = document.getElementById('recordBtn');
+  if (!recordBtn) return;
+  recordBtn.classList.toggle('recording', state.recording);
+  recordBtn.title = state.recording ? '停止录音' : '开始录音';
+}
+
+function renderVoiceCard() {
+  ensureVoiceValidity();
+  const selected = getSelectedVoice();
+  document.getElementById('voiceName').textContent = selected.name;
+  document.getElementById('voiceDesc').textContent = selected.desc;
+  renderVoiceBadges();
+}
+
+function renderMyVoicesView() {
+  const mineVoices = getMineVoices();
+  const pendingVoices = getVisiblePendingCloneVoices();
+  const totalCount = voices.filter((voice) => voice.mine).length + state.pendingCloneVoices.length;
+  const visibleCount = mineVoices.length + pendingVoices.length;
+  const remainingSlotsInView = Math.max(0, 10 - visibleCount);
+  const cloneTextMeta = getCloneTextMeta();
+
+  if (state.cloneView === 'clone' || state.cloneView === 'result') {
+    const sampleLimitReached = state.cloneSamples.length >= 3;
+    const canStop = state.cloneElapsedSec >= 10;
+    const submitDisabled = state.cloneSamples.length === 0 || !state.cloneConsent || state.cloneSlotsRemaining <= 0;
+    const result = state.cloneGeneratedResult;
+
+    return `
+      <div class="my-voices-panel">
+        <div class="clone-inline-view">
+          <div class="clone-inline-head">
+            <button class="clone-back-btn" type="button" id="backToVoiceListBtn">
+              <span>←</span>
+              <span>返回</span>
+            </button>
+            <div class="clone-inline-title">克隆新音色</div>
+          </div>
+
+          <div class="clone-guide-card">
+            <div class="clone-guide-top">
+              <div class="clone-guide-title">引导朗读文本</div>
+              <div class="clone-guide-chip">随机</div>
+            </div>
+            <div class="clone-guide-copy">${cloneTextMeta.text}</div>
+          </div>
+
+          <div class="clone-record-area ${state.cloneRecording ? 'recording' : ''}">
+            ${state.cloneRecording ? `
+              <div class="clone-record-timer">${formatTime(state.cloneElapsedSec)}</div>
+              <button class="clone-stop-btn ${canStop ? '' : 'is-disabled'}" id="cloneStopBtn" type="button">停止录音</button>
+            ` : `
+              <button class="clone-record-button" id="cloneRecordBtn" type="button" ${sampleLimitReached ? 'disabled' : ''}>
+                <span>●</span>
+                <span>${sampleLimitReached ? '已达到 3 条样本上限' : '开始录音'}</span>
+              </button>
+              <div class="clone-record-hint-inline">开始录音即表示您已取得声音授权</div>
+            `}
+          </div>
+
+          ${state.cloneSamples.length ? `
+            <div class="clone-samples-shell">
+              <div class="clone-samples-head">
+                <div class="clone-samples-title">录音样本列表</div>
+                <div class="clone-samples-count">${state.cloneSamples.length}/3</div>
+              </div>
+              <div class="clone-samples-list">
+                ${state.cloneSamples.map((sample) => `
+                  <div class="clone-sample-item">
+                    <button class="clone-sample-play" type="button" data-clone-play="${sample.id}">▶</button>
+                    <div class="clone-sample-meta">
+                      <div class="clone-sample-name">${sample.name}</div>
+                      <div class="clone-sample-sub">${formatTime(sample.duration)} · 语音样本</div>
+                    </div>
+                    <button class="clone-sample-delete" type="button" data-clone-delete="${sample.id}">×</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="clone-inline-toggle">
+              <div class="clone-inline-toggle-label">
+                <div class="clone-inline-toggle-title-row">
+                  <div class="clone-inline-toggle-title">去除噪音</div>
+                  <div class="clone-inline-tooltip" aria-label="去除噪音说明" tabindex="0">
+                    <svg viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="8.2" stroke="currentColor" stroke-width="1.6"/>
+                      <path d="M10 8.1v4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                      <circle cx="10" cy="5.6" r="1" fill="currentColor"/>
+                    </svg>
+                    <div class="clone-inline-tooltip-bubble">若您的音频存在背景噪声，开启这个功能可以提升人声清晰度。若音频质量已经足够理想，建议关闭此功能，得到更好的克隆效果。</div>
+                  </div>
+                </div>
+                <div class="clone-inline-toggle-copy">检测到录音样本后会自动开启，可按需关闭</div>
+              </div>
+              <button class="switch ${state.cloneDenoise ? 'on' : ''}" id="cloneDenoiseToggle" type="button"></button>
+            </div>
+          ` : ''}
+
+          <div class="clone-trial-shell">
+            <div class="clone-trial-label">试听文本</div>
+            <select class="clone-trial-select" id="cloneTextLanguageSelect">
+              ${cloneTextOptions.map((item) => `<option value="${item.id}" ${item.id === state.cloneTextLanguage ? 'selected' : ''}>${item.label}</option>`).join('')}
+            </select>
+            <div class="clone-trial-text">${cloneTextMeta.text}</div>
+          </div>
+
+          <div class="clone-consent-inline" data-clone-consent-row role="checkbox" aria-checked="${state.cloneConsent ? 'true' : 'false'}" tabindex="0">
+            <input id="cloneConsentCheckbox" type="checkbox" ${state.cloneConsent ? 'checked' : ''}>
+            <span>我已阅读并同意《声音克隆功能使用规则》；我确认对所上传的声音样本具有充分、合法、必要的权利或授权，并同意将其用于使用声音克隆功能。</span>
+          </div>
+
+          ${result ? `
+            <div class="clone-result-view">
+              <div class="clone-result-top">
+                <div class="clone-result-slots">剩余音色槽位：${state.cloneSlotsRemaining}/10</div>
+                <button class="clone-result-regen" id="regenCloneBtn" type="button">
+                  <span>✦</span>
+                  <span>重新生成</span>
+                </button>
+              </div>
+
+              <div class="clone-result-title">生成音色结果</div>
+              <div class="clone-result-card">
+                <button class="clone-result-play" type="button" id="cloneResultPlayBtn" title="播放生成音色预览">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 7.5v9l7-4.5-7-4.5Z" fill="currentColor"/>
+                  </svg>
+                </button>
+                <div class="clone-result-meta">
+                  <div class="clone-result-name">${result.title}</div>
+                  ${result.subtitle ? `<div class="clone-result-copy">${result.subtitle}</div>` : ''}
+                </div>
+              </div>
+
+              <div class="clone-result-confirm-row">
+                <button class="clone-result-confirm" id="confirmCloneResultBtn" type="button" title="确认并前往音色登记">确认</button>
+              </div>
+            </div>
+          ` : `
+            <div class="clone-submit-row">
+              <div class="clone-submit-meta">${state.cloneConsent ? `剩余音色槽位：${state.cloneSlotsRemaining}/10` : '请先勾选同意后再提交生成'}</div>
+              <button class="clone-submit-btn-inline" id="submitCloneBtn" type="button" title="${state.cloneConsent ? '提交生成' : '请先勾选同意后提交生成'}" ${submitDisabled ? 'disabled' : ''}>提交生成</button>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  if (!totalCount) {
+    return `
+      <div class="my-voices-panel">
+        <div class="my-voices-empty">
+          <div class="my-voices-empty-inner">
+            <div class="my-voices-empty-mic">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3.6c2.1 0 3.8 1.7 3.8 3.8v3.3c0 2.1-1.7 3.8-3.8 3.8s-3.8-1.7-3.8-3.8V7.4c0-2.1 1.7-3.8 3.8-3.8Z" fill="currentColor"/>
+                <path d="M6.9 11.7c0 3 2.1 5 5.1 5s5.1-2 5.1-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M12 16.8v3.4M9.7 20.2h4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="my-voices-empty-title">还没有专属音色</div>
+            <div class="my-voices-empty-copy">录制 10 秒以上的音频，生成属于你的声音</div>
+            <button class="my-voices-big-cta" type="button" id="openCloneViewEmptyBtn" ${state.cloneSlotsRemaining <= 0 ? 'disabled' : ''}>＋ 克隆新音色</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!visibleCount) {
+    return `
+      <div class="my-voices-panel">
+        <div class="my-voices-toolbar">
+          <button class="my-voices-create" type="button" id="openCloneViewBtn" ${state.cloneSlotsRemaining <= 0 ? 'disabled' : ''}>
+            <span>＋</span>
+            <span>克隆新音色</span>
+          </button>
+        <div class="my-voices-toolbar-left">
+          <div class="my-voices-summary">剩余音色槽位 ${remainingSlotsInView}/10</div>
+        </div>
+      </div>
+        <div class="my-voices-no-match">暂无符合筛选条件的语音</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="my-voices-panel">
+      <div class="my-voices-toolbar">
+        <button class="my-voices-create" type="button" id="openCloneViewBtn" ${state.cloneSlotsRemaining <= 0 ? 'disabled' : ''}>
+          <span>＋</span>
+          <span>克隆新音色</span>
+        </button>
+        <div class="my-voices-toolbar-left">
+          <div class="my-voices-summary">剩余音色槽位 ${remainingSlotsInView}/10</div>
+        </div>
+      </div>
+      <div class="my-voice-list">
+        ${pendingVoices.map((voice) => `
+          <div class="my-voice-item pending">
+            <div class="my-voice-main">
+              <div class="my-voice-icon"><span class="my-voice-loading"></span></div>
+              <div class="my-voice-meta">
+                <div class="my-voice-name">${voice.name}</div>
+                <div class="my-voice-sub">生成中，通常需要 10-30 秒</div>
+              </div>
+            </div>
+            <div class="my-voice-actions">
+              <button class="my-voice-pick" type="button" disabled>生成中</button>
+            </div>
+          </div>
+        `).join('')}
+        ${mineVoices.map((voice) => `
+          <div class="my-voice-item">
+            <div class="my-voice-main">
+              <button class="my-voice-play-icon" type="button" data-my-voice-play="${voice.id}" title="播放录音">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 7.5v9l7-4.5-7-4.5Z" fill="currentColor"/>
+                </svg>
+              </button>
+              <div class="my-voice-meta">
+                <div class="my-voice-name">${voice.name}</div>
+                <div class="my-voice-sub">${getLanguageMeta(voice.languages[0])?.detectLabel || getLanguageMeta(voice.languages[0])?.label || voice.subtitle || ''}</div>
+              </div>
+            </div>
+            <div class="my-voice-actions">
+              <span class="voice-outline-btn">音色克隆</span>
+              <button class="my-voice-pick ${voice.id === state.voice ? 'selected' : ''}" type="button" data-voice-select="${voice.id}">${voice.id === state.voice ? '已选' : '选择'}</button>
+              <button class="voice-icon-btn ${voice.favorite ? 'active' : ''}" type="button" title="${voice.favorite ? '取消收藏' : '收藏'}" data-voice-favorite="${voice.id}">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="m12 4 2.4 4.9 5.4.8-3.9 3.8.9 5.3L12 16.1 7.2 18.8l.9-5.3-3.9-3.8 5.4-.8L12 4Z" ${voice.favorite ? 'fill="currentColor"' : 'stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"'} />
+                </svg>
+              </button>
+              <button class="voice-icon-btn" type="button" title="更多" data-voice-menu="${voice.id}">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="5.5" r="1.7" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="1.7" fill="currentColor"/>
+                  <circle cx="12" cy="18.5" r="1.7" fill="currentColor"/>
+                </svg>
+              </button>
+              ${state.voiceActionMenuId === voice.id ? `
+                <div class="voice-copy-menu">
+                  <button class="voice-copy-btn" type="button" data-copy-voice-id="${voice.id}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <rect x="9" y="9" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                      <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                    <span>复制 Voice ID</span>
+                  </button>
+                  <button class="voice-copy-btn" type="button" data-edit-voice="${voice.id}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 20h4l10.5-10.5a1.8 1.8 0 0 0 0-2.5l-1.5-1.5a1.8 1.8 0 0 0-2.5 0L4 16v4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                      <path d="m13.5 6.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                    <span>编辑</span>
+                  </button>
+                  <button class="voice-copy-btn" type="button" data-delete-voice="${voice.id}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 7h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                      <path d="M9 4h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                      <path d="M7 7l.7 10.1A2 2 0 0 0 9.7 19h4.6a2 2 0 0 0 2-1.9L17 7" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                      <path d="M10 11v4M14 11v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                    <span>删除</span>
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderVoiceModal() {
+  const modal = document.getElementById('voiceModal');
+  const list = document.getElementById('voiceLibraryList');
+  const searchInput = document.getElementById('voiceSearchInput');
+  const toolbar = document.querySelector('.voice-toolbar');
+  const filterSummary = document.getElementById('voiceFilterSummary');
+  const tabs = document.getElementById('voiceTabs');
+
+  modal.classList.toggle('open', state.voiceModalOpen);
+
+  document.querySelectorAll('[data-voice-tab]').forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.voiceTab === state.voiceTab);
+  });
+
+  if (searchInput.value !== state.voiceSearch) {
+    searchInput.value = state.voiceSearch;
+  }
+
+  searchInput.placeholder = state.voiceTab === 'mine'
+    ? '搜索我的音色'
+    : state.voiceTab === 'favorites'
+      ? '搜索收藏音色'
+      : '搜索语音库';
+
+  const clonePageOpen = state.cloneView !== 'list';
+  tabs.style.display = clonePageOpen ? 'none' : 'flex';
+  toolbar.style.display = clonePageOpen ? 'none' : 'grid';
+  filterSummary.style.display = clonePageOpen ? 'none' : '';
+  renderVoiceFilterSummary();
+
+  if (state.voiceTab === 'mine') {
+    list.innerHTML = renderMyVoicesView();
+    return;
+  }
+
+  const visible = getVisibleVoices();
+  list.innerHTML = visible.map((voice) => `
+    <div class="voice-library-item">
+      <div class="voice-library-main">
+        <button class="voice-preview-play" type="button" data-my-voice-play="${voice.id}" title="播放录音">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M9 7.5v9l7-4.5-7-4.5Z" fill="currentColor"/>
+          </svg>
+        </button>
+        <div class="voice-library-meta">
+          <div class="voice-library-name">${voice.name}</div>
+          <div class="voice-library-sub">${voice.subtitle}</div>
+        </div>
+      </div>
+      <div class="voice-library-actions">
+        <button class="voice-select-btn ${voice.id === state.voice ? 'selected' : ''}" type="button" data-voice-select="${voice.id}">
+          ${voice.id === state.voice ? '已选' : '选择'}
+        </button>
+        <button class="voice-icon-btn ${voice.favorite ? 'active' : ''}" type="button" title="${voice.favorite ? '取消收藏' : '收藏'}" data-voice-favorite="${voice.id}">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="m12 4 2.4 4.9 5.4.8-3.9 3.8.9 5.3L12 16.1 7.2 18.8l.9-5.3-3.9-3.8 5.4-.8L12 4Z" ${voice.favorite ? 'fill="currentColor"' : 'stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"'} />
+          </svg>
+        </button>
+        <button class="voice-icon-btn" type="button" title="更多" data-voice-menu="${voice.id}">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="5.5" r="1.7" fill="currentColor"/>
+            <circle cx="12" cy="12" r="1.7" fill="currentColor"/>
+            <circle cx="12" cy="18.5" r="1.7" fill="currentColor"/>
+          </svg>
+        </button>
+        ${state.voiceActionMenuId === voice.id ? `
+          <div class="voice-copy-menu">
+            <button class="voice-copy-btn" type="button" data-copy-voice-id="${voice.id}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="9" y="9" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <span>复制 Voice ID</span>
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `).join('') || `
+    <div class="voice-empty-state">暂无符合筛选条件的语音</div>
+  `;
+}
+
+function getVoiceFilterEntries(filters = state.voiceFilters) {
+  const entries = [];
+
+  if (filters.language) {
+    entries.push({
+      key: 'language',
+      label: '语言',
+      value: getLanguageMeta(filters.language)?.detectLabel || getLanguageMeta(filters.language)?.label || filters.language
+    });
+  }
+
+  if (filters.accent) {
+    entries.push({
+      key: 'accent',
+      label: '口音',
+      value: filters.accent
+    });
+  }
+
+  if (filters.gender && filters.gender !== 'all') {
+    entries.push({
+      key: 'gender',
+      label: '性别',
+      value: genderOptions.find((item) => item.id === filters.gender)?.label || filters.gender
+    });
+  }
+
+  if (filters.age) {
+    entries.push({
+      key: 'age',
+      label: '年龄',
+      value: ageOptions.find((item) => item.id === filters.age)?.label || filters.age
+    });
+  }
+
+  return entries;
+}
+
+function renderVoiceFilterSummary() {
+  const summary = document.getElementById('voiceFilterSummary');
+  const entries = getVoiceFilterEntries();
+
+  summary.classList.toggle('open', entries.length > 0);
+  if (!entries.length) {
+    summary.innerHTML = '';
+    return;
+  }
+
+  summary.innerHTML = `
+    ${entries.map((entry) => `
+      <button class="voice-filter-chip" type="button" data-clear-voice-filter="${entry.key}" title="移除${entry.label}筛选">
+        <span class="voice-filter-chip-key">${entry.label}</span>
+        <span class="voice-filter-chip-divider" aria-hidden="true"></span>
+        <span>${entry.value}</span>
+        <span class="voice-filter-chip-close" aria-hidden="true">×</span>
+      </button>
+    `).join('')}
+    <button class="voice-filter-reset" id="clearVoiceFiltersBtn" type="button" title="重置所有筛选">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 5a7 7 0 1 1-6.1 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M5 5v4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  `;
+}
+
+function renderFilterModal() {
+  const modal = document.getElementById('filterModal');
+  const languageSelect = document.getElementById('filterLanguageSelect');
+  const accentSelect = document.getElementById('filterAccentSelect');
+  const genderSegment = document.getElementById('filterGenderSegment');
+  const ageRow = document.getElementById('filterAgeRow');
+
+  modal.classList.toggle('open', state.filterModalOpen);
+  if (!state.filterModalOpen) return;
+
+  const accents = Array.from(new Set(voices.map((voice) => voice.accent).filter(Boolean)));
+
+  languageSelect.innerHTML = `
+    <option value="">语言</option>
+    ${languages.map((item) => `<option value="${item.id}" ${state.draftVoiceFilters.language === item.id ? 'selected' : ''}>${item.detectLabel}</option>`).join('')}
+  `;
+
+  accentSelect.innerHTML = `
+    <option value="">口音</option>
+    ${accents.map((item) => `<option value="${item}" ${state.draftVoiceFilters.accent === item ? 'selected' : ''}>${item}</option>`).join('')}
+  `;
+
+  genderSegment.innerHTML = genderOptions.map((item) => `
+    <button class="filter-segment-btn ${state.draftVoiceFilters.gender === item.id ? 'active' : ''}" type="button" data-filter-gender="${item.id}">${item.label}</button>
+  `).join('');
+
+  ageRow.innerHTML = ageOptions.map((item) => `
+    <button class="filter-chip ${state.draftVoiceFilters.age === item.id ? 'active' : ''}" type="button" data-filter-age="${item.id}">${item.label}</button>
+  `).join('');
+}
+
+function renderCloneToast() {
+  const toast = document.getElementById('cloneToast');
+  const text = document.getElementById('cloneToastText');
+  toast.classList.toggle('open', state.cloneToastOpen);
+  text.textContent = state.cloneToastMessage;
+}
+
+function renderLeaveConfirmModal() {
+  const modal = document.getElementById('leaveConfirmModal');
+  modal.classList.toggle('open', state.cloneLeaveConfirmOpen);
+}
+
+function renderEditVoiceModal() {
+  const modal = document.getElementById('editVoiceModal');
+  const input = document.getElementById('editVoiceNameInput');
+  const saveBtn = document.getElementById('editVoiceSaveBtn');
+
+  modal.classList.toggle('open', state.editVoiceModalOpen);
+  input.value = state.editVoiceName || '';
+  saveBtn.disabled = !state.editVoiceName.trim();
+}
+
+function renderDeleteVoiceModal() {
+  const modal = document.getElementById('deleteVoiceModal');
+  const copy = document.getElementById('deleteVoiceCopy');
+  const voice = state.pendingDeleteVoiceId ? getVoiceById(state.pendingDeleteVoiceId) : null;
+
+  modal.classList.toggle('open', state.deleteVoiceModalOpen);
+  copy.innerHTML = voice
+    ? `您确定要删除这个音色吗？ “${voice.name}”？<br>此操作无法撤销`
+    : '您确定要删除这个音色吗？<br>此操作无法撤销';
+}
+
+function renderMicroControls() {
+  const emotionBtn = document.getElementById('emotionBtn');
+  const hasSelection = state.selectionEnd > state.selectionStart;
+
+  emotionBtn.disabled = !hasSelection;
+  emotionBtn.classList.toggle('active', state.microPopoverOpen && state.microPopoverType === 'emotion');
+  document.getElementById('pauseBtn').classList.toggle('active', state.microPopoverOpen && state.microPopoverType === 'pause');
+  document.getElementById('interjectionBtn').classList.toggle('active', state.microPopoverOpen && state.microPopoverType === 'interjection');
+}
+
+function renderLongModeToggle() {
+  const toggle = document.getElementById('longModeToggle');
+  toggle.classList.toggle('on', state.longTextMode);
+  toggle.setAttribute('aria-checked', state.longTextMode ? 'true' : 'false');
+}
+
+function renderMicroPopover() {
+  const popover = document.getElementById('microPopover');
+  if (!state.microPopoverOpen || !state.microPopoverType) {
+    popover.classList.remove('open');
+    popover.innerHTML = '';
+    return;
+  }
+
+  if (state.microPopoverType === 'emotion') {
+    const emotions = ['开心', '难过', '生气', '害怕', '厌恶', '惊讶', '中性', '生动'];
+    popover.innerHTML = `
+      <div class="micro-popover-title">选择情绪类型</div>
+      <div class="emotion-grid">
+        ${emotions.map((emotion) => `<button class="emotion-chip" type="button" data-emotion="${emotion}">${emotion}</button>`).join('')}
+      </div>
+    `;
+  } else if (state.microPopoverType === 'pause') {
+    const durations = ['0.25', '0.5', '1.0', '1.5'];
+    popover.innerHTML = `
+      <div class="micro-popover-title">停顿时长</div>
+      <div class="pause-list">
+        ${durations.map((duration) => `<button class="pause-chip" type="button" data-pause-duration="${duration}">${duration}s</button>`).join('')}
+      </div>
+      <div class="pause-custom">
+        <input id="pauseCustomInput" type="text" inputmode="decimal" placeholder="0.01～99.99">
+        <button type="button" id="pauseCustomApplyBtn">自定义</button>
+      </div>
+    `;
+  } else if (state.microPopoverType === 'interjection') {
+    const presets = ['啊', '呀', '哇', '唉', '呃', '哈', '欸', '嗯'];
+    popover.innerHTML = `
+      <div class="micro-popover-title">语气词预设库</div>
+      <div class="interjection-grid">
+        ${presets.map((item) => `<button class="interjection-chip" type="button" data-interjection="${item}">${item}</button>`).join('')}
+      </div>
+    `;
+  }
+
+  popover.classList.add('open');
+}
+
+function renderRegisterModal() {
+  const modal = document.getElementById('registerModal');
+  const title = document.querySelector('.register-title');
+  const nameSection = document.getElementById('registerNameSection');
+  const tagSection = document.getElementById('registerTagSection');
+  const descSection = document.getElementById('registerDescSection');
+  const actions = document.getElementById('registerActions');
+  const backBtn = document.getElementById('registerBackBtn');
+  const nameInput = document.getElementById('registerNameInput');
+  const descInput = document.getElementById('registerDescInput');
+  const tagRow = document.getElementById('registerTagRow');
+  const saveBtn = document.getElementById('registerSaveBtn');
+
+  modal.classList.toggle('open', state.registerModalOpen);
+  title.textContent = '音色登记';
+  nameSection.style.display = 'grid';
+  tagSection.style.display = 'grid';
+  descSection.style.display = 'grid';
+  backBtn.style.display = 'inline-flex';
+  actions.style.justifyContent = 'flex-end';
+  nameInput.placeholder = '输入你的专属音色名称';
+  nameInput.value = state.cloneName;
+  descInput.value = state.cloneDescription || '';
+  tagRow.innerHTML = `
+    <div class="register-tag-grid">
+      <div class="register-tag-pill">
+        <span class="register-tag-value">${getRegisterTags()[0]}</span>
+        <span class="register-tag-close">×</span>
+      </div>
+      <label class="register-tag-select-wrap">
+        <select class="register-tag-select ${state.registerGender ? '' : 'is-placeholder'}" id="registerGenderSelect">
+          <option value="">请选择性别</option>
+          ${genderOptions
+            .filter((item) => item.id !== 'all')
+            .map((item) => `<option value="${item.id}" ${item.id === state.registerGender ? 'selected' : ''}>${item.label}</option>`)
+            .join('')}
+        </select>
+        <span class="register-tag-arrow">▾</span>
+      </label>
+    </div>
+  `;
+  saveBtn.textContent = '保存音色';
+  saveBtn.disabled = !state.cloneName.trim();
+}
+
+function renderBasicSliders() {
+  const container = document.getElementById('basicSliderStack');
+  container.innerHTML = basicSliderMeta.map((item) => `
+    <div class="slider-group">
+      <div class="slider-head">
+        <div class="slider-name">${item.label}</div>
+        <div class="value-chip" id="basicValue-${item.key}">${item.format(state.basic[item.key])}</div>
+      </div>
+      <input
+        type="range"
+        min="${item.min}"
+        max="${item.max}"
+        step="${item.step}"
+        value="${state.basic[item.key]}"
+        data-basic-slider="${item.key}"
+      >
+    </div>
+  `).join('');
+
+  container.querySelectorAll('input[type="range"]').forEach(updateRangeTrack);
+}
+
+function renderAdvancedSliders() {
+  const container = document.getElementById('advancedSliderStack');
+  container.innerHTML = advancedSliderMeta.map((item) => `
+    <div class="slider-group">
+      <div class="slider-side-labels">
+        <span>${item.label}</span>
+        <span>${item.rightLabel}</span>
+      </div>
+      <div class="tone-slider-row">
+        <div class="mini-value">-10</div>
+        <input
+          type="range"
+          min="${item.min}"
+          max="${item.max}"
+          step="${item.step}"
+          value="${state.advanced[item.key]}"
+          data-advanced-slider="${item.key}"
+        >
+        <div class="mini-value">+10</div>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('input[type="range"]').forEach(updateRangeTrack);
+}
+
+function renderEffectSwitches() {
+  const list = document.getElementById('effectSwitchList');
+  list.innerHTML = effectMeta.map((item) => `
+    <div class="switch-item">
+      <div class="switch-item-label">${item.label}</div>
+      <button class="switch ${state.advanced.effects[item.key] ? 'on' : ''}" type="button" data-effect-switch="${item.key}"></button>
+    </div>
+  `).join('');
+}
+
+function isAdvancedEnabled() {
+  const sliderTouched = Object.entries(state.advanced)
+    .filter(([key]) => key !== 'effects')
+    .some(([key, value]) => value !== defaults.advanced[key]);
+  const effectEnabled = Object.values(state.advanced.effects).some(Boolean);
+  return sliderTouched || effectEnabled;
+}
+
+function renderVoiceBadges() {
+  const advancedEnabled = isAdvancedEnabled();
+  document.getElementById('voiceEffectBadge').style.display = advancedEnabled ? 'inline-flex' : 'none';
+}
+
+function renderAdvancedState() {
+  const enabled = isAdvancedEnabled();
+  const badge = document.getElementById('advancedStatusBadge');
+  badge.style.display = enabled ? 'inline-flex' : 'none';
+  renderVoiceBadges();
+}
+
+function renderSettingsState() {
+  document.getElementById('settingsPanel').classList.toggle('open', state.settingsOpen);
+  document.getElementById('settingsBtn').classList.toggle('active', state.settingsOpen);
+}
+
+function renderSections() {
+  document.getElementById('basicSection').classList.toggle('collapsed', state.collapsedBasic);
+  document.getElementById('basicSection').classList.toggle('expanded', !state.collapsedBasic);
+  document.getElementById('advancedSection').classList.toggle('collapsed', state.collapsedAdvanced);
+  document.getElementById('advancedSection').classList.toggle('expanded', !state.collapsedAdvanced);
+}
+
+function renderCounter() {
+  clampVoiceTextLength();
+  document.getElementById('charCount').textContent = String(state.text.length);
+  const counterNode = document.querySelector('.counter');
+  if (counterNode) {
+    counterNode.innerHTML = `<span id="charCount">${state.text.length}</span>/${getTextLimit().toLocaleString('en-US')}`;
+  }
+  document.getElementById('sendBtn').disabled = state.text.trim().length === 0;
+}
+
+function renderTextArea() {
+  const input = document.getElementById('ttsInput');
+  if (input.value !== state.text) {
+    input.value = state.text;
+  }
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(Math.max(input.scrollHeight, 108), 260)}px`;
+  if (document.activeElement === input) {
+    input.setSelectionRange(state.selectionStart, state.selectionEnd);
+  }
+}
+
+function render() {
+  renderModelMenu();
+  renderLanguageMenu();
+  renderRecordingState();
+  renderMicroControls();
+  renderLongModeToggle();
+  renderMicroPopover();
+  renderVoiceCard();
+  renderVoiceModal();
+  renderFilterModal();
+  renderCloneToast();
+  renderLeaveConfirmModal();
+  renderEditVoiceModal();
+  renderDeleteVoiceModal();
+  renderRegisterModal();
+  renderBasicSliders();
+  renderAdvancedSliders();
+  renderEffectSwitches();
+  renderAdvancedState();
+  renderSettingsState();
+  renderSections();
+  renderCounter();
+  renderTextArea();
+  document.getElementById('taskDropdown').classList.toggle('open', state.taskMenuOpen);
+}
+
+document.addEventListener('click', (event) => {
+  const trigger = event.target.closest('[data-dropdown-trigger]');
+  if (trigger) {
+    const id = trigger.dataset.dropdownTrigger;
+    if (id === 'modelDropdown') {
+      state.modelMenuOpen = !state.modelMenuOpen;
+      state.taskMenuOpen = false;
+    } else if (id === 'taskDropdown') {
+      state.taskMenuOpen = !state.taskMenuOpen;
+      state.modelMenuOpen = false;
+    }
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-model-option]')) {
+    state.model = event.target.closest('[data-model-option]').dataset.modelOption;
+    state.modelMenuOpen = false;
+    render();
+    return;
+  }
+
+  if (event.target.closest('#settingsBtn')) {
+    state.settingsOpen = !state.settingsOpen;
+    renderSettingsState();
+    return;
+  }
+
+  if (event.target.closest('#emotionBtn')) {
+    if (state.selectionEnd <= state.selectionStart) {
+      return;
+    }
+    openMicroPopover('emotion');
+    render();
+    return;
+  }
+
+  if (event.target.closest('#pauseBtn')) {
+    const token = '<#0.25#>';
+    const start = state.selectionStart;
+    insertAtCursor(token);
+    state.pauseTokenRange = { start, end: start + token.length };
+    openMicroPopover('pause');
+    render();
+    return;
+  }
+
+  if (event.target.closest('#interjectionBtn')) {
+    openMicroPopover('interjection');
+    render();
+    return;
+  }
+
+  if (event.target.closest('#longModeToggle')) {
+    state.longTextMode = !state.longTextMode;
+    clampVoiceTextLength();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#langTrigger')) {
+    state.langMenuOpen = !state.langMenuOpen;
+    renderLanguageMenu();
+    return;
+  }
+
+  if (event.target.closest('#copyCurrentVoiceNameBtn')) {
+    const selected = getSelectedVoice();
+    copyText(selected.name).then((copied) => {
+      showCloneToast(copied ? `已复制音色名称：${selected.name}` : `复制失败，请手动复制：${selected.name}`);
+    });
+    return;
+  }
+
+  if (event.target.closest('#voiceCurrentCard')) {
+    if (event.target.closest('#langDropdown')) {
+      return;
+    }
+    state.voiceModalOpen = true;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-lang-option]')) {
+    state.language = event.target.closest('[data-lang-option]').dataset.langOption;
+    state.langMenuOpen = false;
+    ensureVoiceValidity();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#voiceModalClose')) {
+    state.voiceModalOpen = false;
+    leaveCloneView();
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-voice-tab]')) {
+    const nextTab = event.target.closest('[data-voice-tab]').dataset.voiceTab;
+    if (nextTab !== 'mine') {
+      leaveCloneView();
+    }
+    state.voiceTab = nextTab;
+    state.voiceActionMenuId = null;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('#openFilterBtn')) {
+    state.filterModalOpen = true;
+    state.voiceActionMenuId = null;
+    state.draftVoiceFilters = structuredClone(state.voiceFilters);
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-voice-select]')) {
+    state.voice = event.target.closest('[data-voice-select]').dataset.voiceSelect;
+    state.voiceActionMenuId = null;
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-voice-favorite]')) {
+    const voiceId = event.target.closest('[data-voice-favorite]').dataset.voiceFavorite;
+    const voice = voices.find((item) => item.id === voiceId);
+    if (voice) {
+      voice.favorite = !voice.favorite;
+    }
+    state.voiceActionMenuId = null;
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-voice-menu]')) {
+    const voiceId = event.target.closest('[data-voice-menu]').dataset.voiceMenu;
+    state.voiceActionMenuId = state.voiceActionMenuId === voiceId ? null : voiceId;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-copy-voice-id]')) {
+    const voiceId = event.target.closest('[data-copy-voice-id]').dataset.copyVoiceId;
+    copyText(voiceId).then((copied) => {
+      showCloneToast(copied ? `已复制 Voice ID：${voiceId}` : `复制失败，请手动复制：${voiceId}`);
+    });
+    state.voiceActionMenuId = null;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-my-voice-play]')) {
+    const voiceId = event.target.closest('[data-my-voice-play]').dataset.myVoicePlay;
+    playVoicePreview(voiceId);
+    state.voiceActionMenuId = null;
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-edit-voice]')) {
+    const voiceId = event.target.closest('[data-edit-voice]').dataset.editVoice;
+    const voice = getVoiceById(voiceId);
+    if (!voice) {
+      return;
+    }
+    state.editVoiceId = voiceId;
+    state.editVoiceName = voice.name;
+    state.editVoiceModalOpen = true;
+    state.voiceActionMenuId = null;
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-delete-voice]')) {
+    const voiceId = event.target.closest('[data-delete-voice]').dataset.deleteVoice;
+    const voice = getVoiceById(voiceId);
+    if (!voice) {
+      return;
+    }
+    state.pendingDeleteVoiceId = voiceId;
+    state.deleteVoiceModalOpen = true;
+    state.voiceActionMenuId = null;
+    render();
+    return;
+  }
+
+  if (event.target.closest('#editVoiceModalClose')) {
+    closeEditVoiceModal();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#editVoiceSaveBtn')) {
+    if (!state.editVoiceName.trim() || !state.editVoiceId) {
+      return;
+    }
+    const voice = getVoiceById(state.editVoiceId);
+    if (voice) {
+      voice.name = state.editVoiceName.trim();
+      showCloneToast(`已保存音色名：${voice.name}`);
+    }
+    closeEditVoiceModal();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#deleteVoiceModalClose') || event.target.closest('#deleteVoiceCancelBtn')) {
+    closeDeleteVoiceModal();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#deleteVoiceConfirmBtn')) {
+    let deletedVoiceName = '';
+    if (state.pendingDeleteVoiceId) {
+      const voiceIndex = voices.findIndex((item) => item.id === state.pendingDeleteVoiceId);
+      if (voiceIndex >= 0) {
+        deletedVoiceName = voices[voiceIndex].name;
+        voices.splice(voiceIndex, 1);
+      }
+    }
+    closeDeleteVoiceModal();
+    ensureVoiceValidity();
+    if (deletedVoiceName) {
+      showCloneToast(`已删除音色：${deletedVoiceName}`);
+    }
+    render();
+    return;
+  }
+
+  if (event.target.closest('#openCloneViewBtn') || event.target.closest('#openCloneViewEmptyBtn')) {
+    openCloneView();
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('#backToVoiceListBtn')) {
+    requestLeaveCloneView();
+    return;
+  }
+
+  if (event.target.closest('#leaveConfirmClose') || event.target.closest('#leaveConfirmCancel')) {
+    state.cloneLeaveConfirmOpen = false;
+    render();
+    return;
+  }
+
+  if (event.target.closest('#leaveConfirmSubmit')) {
+    leaveCloneView();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#cloneRecordBtn')) {
+    if (state.cloneSamples.length >= 3) {
+      return;
+    }
+    state.cloneRecording = true;
+    state.cloneElapsedSec = 0;
+    renderVoiceModal();
+    cloneRecordingInterval = window.setInterval(() => {
+      state.cloneElapsedSec += 1;
+      renderVoiceModal();
+      if (state.cloneElapsedSec >= 60) {
+        finishCloneRecording();
+        renderVoiceModal();
+      }
+    }, 1000);
+    return;
+  }
+
+  if (event.target.closest('#cloneStopBtn')) {
+    if (state.cloneElapsedSec < 10) {
+      showCloneToast('录音时长需在 10 秒到 60 秒之间');
+      return;
+    }
+    finishCloneRecording();
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-clone-delete]')) {
+    const sampleId = event.target.closest('[data-clone-delete]').dataset.cloneDelete;
+    state.cloneSamples = state.cloneSamples.filter((sample) => sample.id !== sampleId);
+    if (!state.cloneSamples.length) {
+      state.cloneDenoise = false;
+    }
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-clone-play]')) {
+    return;
+  }
+
+  if (event.target.closest('#cloneDenoiseToggle')) {
+    state.cloneDenoise = !state.cloneDenoise;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('[data-clone-consent-row]')) {
+    if (event.target.closest('#cloneConsentCheckbox')) {
+      return;
+    }
+    state.cloneConsent = !state.cloneConsent;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('#submitCloneBtn')) {
+    if (!state.cloneSamples.length || !state.cloneConsent || state.cloneSlotsRemaining <= 0) {
+      return;
+    }
+    generateCloneResultPreview();
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('#regenCloneBtn')) {
+    generateCloneResultPreview();
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.closest('#cloneResultPlayBtn')) {
+    showCloneToast('正在播放生成音色预览');
+    return;
+  }
+
+  if (event.target.closest('#confirmCloneResultBtn')) {
+    state.registerModalOpen = true;
+    state.cloneName = '';
+    state.cloneDescription = '';
+    state.registerGender = '';
+    render();
+    return;
+  }
+
+  if (event.target.closest('#registerModalClose') || event.target.closest('#registerBackBtn')) {
+    closeRegisterModal();
+    renderRegisterModal();
+    return;
+  }
+
+  if (event.target.closest('#registerSaveBtn')) {
+    if (!state.cloneName.trim()) {
+      return;
+    }
+    const description = state.cloneDescription.trim();
+    const savedName = state.cloneName.trim();
+
+    const pendingId = `pending-${Date.now()}`;
+    state.pendingCloneVoices.unshift({
+      id: pendingId,
+      name: savedName,
+      language: state.cloneTextLanguage
+    });
+    state.cloneSlotsRemaining = Math.max(0, state.cloneSlotsRemaining - 1);
+    closeRegisterModal();
+    leaveCloneView();
+    state.cloneSamples = [];
+    state.cloneDenoise = false;
+    state.cloneName = '';
+    state.cloneDescription = '';
+    const selectedGender = state.registerGender;
+    const selectedGenderLabel = genderOptions.find((item) => item.id === selectedGender)?.label;
+    state.registerGender = '';
+    render();
+
+    window.setTimeout(() => {
+      const pendingIndex = state.pendingCloneVoices.findIndex((item) => item.id === pendingId);
+      if (pendingIndex >= 0) {
+        const pending = state.pendingCloneVoices.splice(pendingIndex, 1)[0];
+        const generatedId = `clone-${Date.now()}`;
+        voices.unshift({
+          id: generatedId,
+          name: savedName || pending.name,
+          subtitle: 'myself',
+          desc: description || `${getLanguageMeta(pending.language)?.detectLabel || cloneTextOptions.find((item) => item.id === pending.language)?.label || pending.language} · 基于个人样本生成`,
+          languages: [pending.language],
+          tags: ['音色克隆', ...(selectedGenderLabel ? [selectedGenderLabel] : [])],
+          libraryTags: ['音色克隆'],
+          cloneGenerated: true,
+          mine: true,
+          favorite: false,
+          gender: selectedGender || ''
+        });
+        state.voice = generatedId;
+        render();
+      }
+    }, 2200);
+    return;
+  }
+
+  if (event.target.closest('[data-emotion]')) {
+    const emotion = event.target.closest('[data-emotion]').dataset.emotion;
+    const selected = getSelectedText();
+    if (selected) {
+      replaceTextRange(state.selectionStart, state.selectionEnd, `【${emotion}】${selected}`);
+      closeMicroPopover();
+      render();
+    }
+    return;
+  }
+
+  if (event.target.closest('[data-pause-duration]')) {
+    const duration = event.target.closest('[data-pause-duration]').dataset.pauseDuration;
+    if (state.pauseTokenRange) {
+      replaceTextRange(state.pauseTokenRange.start, state.pauseTokenRange.end, `<#${duration}#>`);
+    }
+    closeMicroPopover();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#pauseCustomApplyBtn')) {
+    const input = document.getElementById('pauseCustomInput');
+    const raw = input?.value.trim() || '';
+    const value = Number(raw);
+    if (!raw || !Number.isFinite(value) || value < 0.01 || value > 99.99) {
+      showCloneToast('停顿时长需在 0.01 到 99.99 秒之间');
+      return;
+    }
+    if (state.pauseTokenRange) {
+      replaceTextRange(state.pauseTokenRange.start, state.pauseTokenRange.end, `<#${value.toFixed(raw.includes('.') ? Math.min(raw.split('.')[1].length, 2) : 2)}#>`);
+    }
+    closeMicroPopover();
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-interjection]')) {
+    const value = event.target.closest('[data-interjection]').dataset.interjection;
+    insertAtCursor(`（${value}）`);
+    closeMicroPopover();
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-collapse="basic"]')) {
+    state.collapsedBasic = !state.collapsedBasic;
+    renderSections();
+    return;
+  }
+
+  if (event.target.closest('[data-collapse="advanced"]')) {
+    state.collapsedAdvanced = !state.collapsedAdvanced;
+    renderSections();
+    return;
+  }
+
+  if (event.target.closest('#resetBasicBtn')) {
+    state.basic = structuredClone(defaults.basic);
+    renderBasicSliders();
+    return;
+  }
+
+  if (event.target.closest('#resetAdvancedBtn')) {
+    state.advanced = structuredClone(defaults.advanced);
+    renderAdvancedSliders();
+    renderEffectSwitches();
+    renderAdvancedState();
+    renderVoiceCard();
+    return;
+  }
+
+  if (event.target.closest('[data-effect-switch]')) {
+    const key = event.target.closest('[data-effect-switch]').dataset.effectSwitch;
+    state.advanced.effects[key] = !state.advanced.effects[key];
+    renderEffectSwitches();
+    renderAdvancedState();
+    renderVoiceCard();
+    return;
+  }
+
+  if (event.target.closest('#translateBtn')) {
+    if (!state.text.trim()) {
+      return;
+    }
+    state.text = translateTextToEnglish(state.text);
+    state.language = 'en';
+    ensureVoiceValidity();
+    render();
+    return;
+  }
+
+  if (event.target.closest('#recordBtn')) {
+    startRecording();
+    return;
+  }
+
+  if (event.target.closest('#filterModalClose')) {
+    state.filterModalOpen = false;
+    renderFilterModal();
+    return;
+  }
+
+  if (event.target.closest('[data-filter-gender]')) {
+    state.draftVoiceFilters.gender = event.target.closest('[data-filter-gender]').dataset.filterGender;
+    renderFilterModal();
+    return;
+  }
+
+  if (event.target.closest('[data-filter-age]')) {
+    const age = event.target.closest('[data-filter-age]').dataset.filterAge;
+    state.draftVoiceFilters.age = state.draftVoiceFilters.age === age ? '' : age;
+    renderFilterModal();
+    return;
+  }
+
+  if (event.target.closest('#filterResetBtn')) {
+    state.draftVoiceFilters = emptyVoiceFilters();
+    renderFilterModal();
+    return;
+  }
+
+  if (event.target.closest('#filterApplyBtn')) {
+    state.voiceFilters = structuredClone(state.draftVoiceFilters);
+    state.filterModalOpen = false;
+    render();
+    return;
+  }
+
+  if (event.target.closest('[data-clear-voice-filter]')) {
+    const key = event.target.closest('[data-clear-voice-filter]').dataset.clearVoiceFilter;
+    if (key === 'gender') {
+      state.voiceFilters.gender = 'all';
+    } else {
+      state.voiceFilters[key] = '';
+    }
+    state.draftVoiceFilters = structuredClone(state.voiceFilters);
+    render();
+    return;
+  }
+
+  if (event.target.closest('#clearVoiceFiltersBtn')) {
+    state.voiceFilters = emptyVoiceFilters();
+    state.draftVoiceFilters = emptyVoiceFilters();
+    render();
+    return;
+  }
+
+  if (!event.target.closest('#modelDropdown')) {
+    state.modelMenuOpen = false;
+  }
+
+  if (!event.target.closest('#taskDropdown')) {
+    state.taskMenuOpen = false;
+  }
+
+  if (!event.target.closest('#langDropdown')) {
+    state.langMenuOpen = false;
+  }
+
+  if (!event.target.closest('.micro-controls') && !event.target.closest('#microPopover')) {
+    closeMicroPopover();
+  }
+
+  if (!event.target.closest('.voice-library-actions') && !event.target.closest('.my-voice-actions') && !event.target.closest('.voice-copy-menu')) {
+    state.voiceActionMenuId = null;
+  }
+
+  if (!event.target.closest('#voiceSection')) {
+    const modalPanel = event.target.closest('.voice-modal-panel');
+    if (!modalPanel) {
+      state.voiceModalOpen = false;
+      leaveCloneView();
+    }
+  }
+
+  if (!event.target.closest('.filter-panel')) {
+    const filterModal = event.target.closest('#filterModal');
+    if (filterModal && event.target === filterModal) {
+      state.filterModalOpen = false;
+    }
+  }
+
+  if (!event.target.closest('.register-panel')) {
+    const registerModal = event.target.closest('#registerModal');
+    if (registerModal && event.target === registerModal) {
+      closeRegisterModal();
+    }
+  }
+
+  if (!event.target.closest('.edit-voice-panel')) {
+    const editVoiceModal = event.target.closest('#editVoiceModal');
+    if (editVoiceModal && event.target === editVoiceModal) {
+      closeEditVoiceModal();
+    }
+  }
+
+  if (!event.target.closest('.delete-voice-panel')) {
+    const deleteVoiceModal = event.target.closest('#deleteVoiceModal');
+    if (deleteVoiceModal && event.target === deleteVoiceModal) {
+      closeDeleteVoiceModal();
+    }
+  }
+
+  if (!event.target.closest('.leave-confirm-panel')) {
+    const leaveConfirmModal = event.target.closest('#leaveConfirmModal');
+    if (leaveConfirmModal && event.target === leaveConfirmModal) {
+      state.cloneLeaveConfirmOpen = false;
+    }
+  }
+
+  render();
+});
+
+document.addEventListener('input', (event) => {
+  if (event.target.matches('#editVoiceNameInput')) {
+    state.editVoiceName = event.target.value.slice(0, 30);
+    renderEditVoiceModal();
+    return;
+  }
+
+  if (event.target.matches('#registerNameInput')) {
+    state.cloneName = event.target.value.slice(0, 30);
+    renderRegisterModal();
+    return;
+  }
+
+  if (event.target.matches('#voiceSearchInput')) {
+    state.voiceSearch = event.target.value;
+    state.voiceActionMenuId = null;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.matches('#filterLanguageSelect')) {
+    state.draftVoiceFilters.language = event.target.value;
+    return;
+  }
+
+  if (event.target.matches('#filterAccentSelect')) {
+    state.draftVoiceFilters.accent = event.target.value;
+    return;
+  }
+
+  if (event.target.matches('#cloneTextLanguageSelect')) {
+    state.cloneTextLanguage = event.target.value;
+    renderVoiceModal();
+    return;
+  }
+
+  if (event.target.matches('#registerDescInput')) {
+    state.cloneDescription = event.target.value.slice(0, 120);
+    return;
+  }
+
+  if (event.target.matches('#registerGenderSelect')) {
+    state.registerGender = event.target.value;
+    renderRegisterModal();
+    return;
+  }
+
+  if (event.target.matches('[data-basic-slider]')) {
+    const key = event.target.dataset.basicSlider;
+    state.basic[key] = Number(event.target.value);
+    updateRangeTrack(event.target);
+    const meta = basicSliderMeta.find((item) => item.key === key);
+    const label = document.getElementById(`basicValue-${key}`);
+    if (meta && label) {
+      label.textContent = meta.format(state.basic[key]);
+    }
+    return;
+  }
+
+  if (event.target.matches('[data-advanced-slider]')) {
+    const key = event.target.dataset.advancedSlider;
+    state.advanced[key] = Number(event.target.value);
+    updateRangeTrack(event.target);
+    renderAdvancedState();
+  }
+});
+
+document.addEventListener('change', (event) => {
+  if (event.target.matches('#cloneConsentCheckbox')) {
+    state.cloneConsent = event.target.checked;
+    renderVoiceModal();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    let handled = false;
+
+    if (state.deleteVoiceModalOpen) {
+      closeDeleteVoiceModal();
+      handled = true;
+    } else if (state.editVoiceModalOpen) {
+      closeEditVoiceModal();
+      handled = true;
+    } else if (state.registerModalOpen) {
+      closeRegisterModal();
+      handled = true;
+    }
+
+    if (handled) {
+      render();
+      return;
+    }
+  }
+
+  if (event.key === 'Enter' && event.target.matches('#editVoiceNameInput')) {
+    event.preventDefault();
+    if (!state.editVoiceName.trim() || !state.editVoiceId) {
+      return;
+    }
+    const voice = getVoiceById(state.editVoiceId);
+    if (!voice) {
+      return;
+    }
+    voice.name = state.editVoiceName.trim();
+    showCloneToast(`已保存音色名：${voice.name}`);
+    closeEditVoiceModal();
+    render();
+    return;
+  }
+
+  const consentRow = event.target.closest('[data-clone-consent-row]');
+  if (!consentRow) {
+    return;
+  }
+
+  if (event.key === ' ' || event.key === 'Enter') {
+    event.preventDefault();
+    state.cloneConsent = !state.cloneConsent;
+    renderVoiceModal();
+  }
+});
+
+const input = document.getElementById('ttsInput');
+input.addEventListener('input', (event) => {
+  state.text = event.target.value;
+  clampVoiceTextLength();
+  state.selectionStart = event.target.selectionStart || 0;
+  state.selectionEnd = event.target.selectionEnd || 0;
+  renderCounter();
+  renderTextArea();
+  renderMicroControls();
+});
+
+['select', 'click', 'keyup'].forEach((eventName) => {
+  input.addEventListener(eventName, () => {
+    state.selectionStart = input.selectionStart || 0;
+    state.selectionEnd = input.selectionEnd || 0;
+    renderMicroControls();
+  });
+});
+
+document.getElementById('sendBtn').addEventListener('click', () => {
+  if (state.text.trim().length === 0) return;
+  window.alert(`已提交语音合成任务\n模型：${modelOptions.find((item) => item.id === state.model)?.name}\n音色：${getSelectedVoice().name}`);
+});
+
+render();
+</script>
+</body>
+</html>

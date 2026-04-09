@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype Hub</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-soft: #0f1c2f;
+      --panel: rgba(16, 28, 47, 0.84);
+      --panel-strong: rgba(18, 34, 57, 0.96);
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #e5eefb;
+      --text-soft: #97abc9;
+      --blue: #69b7ff;
+      --mint: #63e2c6;
+      --violet: #a98bff;
+      --shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "PingFang SC", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(105, 183, 255, 0.18), transparent 28%),
+        radial-gradient(circle at 85% 15%, rgba(169, 139, 255, 0.14), transparent 24%),
+        linear-gradient(180deg, #091320 0%, var(--bg) 100%);
+      color: var(--text);
+    }
+
+    .shell {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 32px auto;
+      padding: 28px;
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(10, 20, 35, 0.88), rgba(7, 16, 29, 0.94));
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+      gap: 20px;
+      align-items: stretch;
+      margin-bottom: 26px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .card {
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero-main {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(105, 183, 255, 0.1);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(32px, 4vw, 54px);
+      line-height: 1.02;
+    }
+
+    .subtitle {
+      margin: 0;
+      max-width: 680px;
+      color: var(--text-soft);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .hero-side {
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+      background: linear-gradient(180deg, rgba(15, 28, 47, 0.94), rgba(17, 36, 61, 0.92));
+    }
+
+    .stat {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .stat-label {
+      color: var(--text-soft);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-value {
+      margin-top: 8px;
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #06111f;
+      background: var(--mint);
+    }
+
+    .card:nth-child(2) .tag {
+      background: var(--blue);
+    }
+
+    .card:nth-child(3) .tag {
+      background: var(--violet);
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--text-soft);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    a.button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    a.button:hover {
+      transform: translateY(-1px);
+    }
+
+    a.button-primary {
+      color: #04111f;
+      background: linear-gradient(135deg, #8cd0ff, #63e2c6);
+    }
+
+    a.button-secondary {
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .footer {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(148, 163, 184, 0.14);
+      color: var(--text-soft);
+      font-size: 13px;
+    }
+
+    @media (max-width: 920px) {
+      .hero,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">Prototype Hub</div>
+        <h1>一个仓库，统一承载你的产品原型。</h1>
+        <p class="subtitle">
+          这里把 MJ7、MiniMax Speech 和 LibTV 作者标签后台三个原型放到了同一个入口下。
+          发布时只需要维护一个仓库，访问时则通过不同目录访问不同原型。
+        </p>
+      </div>
+      <aside class="hero-side">
+        <div class="stat">
+          <div class="stat-label">Published Paths</div>
+          <div class="stat-value">3</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Working Branches</div>
+          <div class="stat-value">proto/*</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Recommended Flow</div>
+          <div class="stat-value">Main for Pages</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <span class="tag">MJ7</span>
+        <h2>Youchuan Generator Prototype</h2>
+        <p>保留误推回退后的 MJ7 原型快照，适合作为独立原型目录继续演进。</p>
+        <div class="actions">
+          <a class="button button-primary" href="./prototypes/mj7/">Open Prototype</a>
+          <a class="button button-secondary" href="./prototypes/mj7/README.source.md">Source Notes</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="tag">MiniMax</span>
+        <h2>MiniMax Speech Prototype</h2>
+        <p>保留已同步到 `minimax-speech-prototype` 的最新静态原型，可单独在 `proto/minimax-speech` 上持续迭代。</p>
+        <div class="actions">
+          <a class="button button-primary" href="./prototypes/minimax-speech/">Open Prototype</a>
+          <a class="button button-secondary" href="./prototypes/minimax-speech/README.source.md">Source Notes</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="tag">LibTV</span>
+        <h2>LibTV Author Tag Admin</h2>
+        <p>对外发布静态预览，对内保留一份 `source/` 源码快照，方便后续继续做 React/Vite 版本开发。</p>
+        <div class="actions">
+          <a class="button button-primary" href="./prototypes/libtv-author-tag/">Open Prototype</a>
+          <a class="button button-secondary" href="./prototypes/libtv-author-tag/source/preview.html">View Source Snapshot</a>
+        </div>
+      </article>
+    </section>
+
+    <div class="footer">
+      `my-visualization-page` 暂未纳入这个仓库，因为它不属于当前原型集合。
+    </div>
+  </main>
+</body>
+</html>
