@@ -2,6 +2,13 @@
 
 Unified home for product prototypes managed in one repository.
 
+## Live Links
+
+- Hub index: `https://dazaiissa02-zhao.github.io/prototype-hub/`
+- MJ7 prototype: `https://dazaiissa02-zhao.github.io/prototype-hub/prototypes/mj7/`
+- MiniMax speech prototype: `https://dazaiissa02-zhao.github.io/prototype-hub/prototypes/minimax-speech/`
+- LibTV author tag prototype: `https://dazaiissa02-zhao.github.io/prototype-hub/prototypes/libtv-author-tag/`
+
 ## Structure
 
 - `prototypes/mj7`: MJ7 prototype snapshot
